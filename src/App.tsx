@@ -20,6 +20,8 @@ import {
   Settings, Zap, Swords, RotateCcw, AlertTriangle, ShieldCheck, Gamepad2, FolderOpen
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+// @ts-ignore
+import logoImg from '../images/Logo.png';
 
 export default function App() {
   // Game state
@@ -438,7 +440,7 @@ export default function App() {
                 {/* Clean soft ambient glow behind the logo */}
                 <div className="absolute inset-4 rounded-full bg-blue-500/10 blur-2xl animate-pulse"></div>
                 <img 
-                  src="/images/Logo.png" 
+                  src={logoImg} 
                   alt="등급 보류 : F급 헌터" 
                   referrerPolicy="no-referrer"
                   className="relative z-10 w-full h-auto object-contain drop-shadow-[0_0_35px_rgba(59,130,246,0.2)]"
