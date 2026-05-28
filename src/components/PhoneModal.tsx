@@ -5,13 +5,14 @@
 
 import React, { useState } from 'react';
 import { Npc, Equipment, Dungeon, BodyPartsHP, ChatHistory } from '../types';
-import { FAIL_LOGS } from '../data';
+import { FAIL_LOGS, ACHIEVEMENTS } from '../data';
 import { 
   User, Users, MessageSquare, Compass, Briefcase, Archive,
   ShieldAlert, Shield, Star, Heart, CheckCircle2, ChevronRight,
-  Sparkles, CornerDownLeft, AlertCircle, ShoppingBag
+  Sparkles, CornerDownLeft, AlertCircle, ShoppingBag, Award
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { getActiveStoryForNpc, interpolateText, CHAT_STORIES, ChatStory, ChatStoryChoice } from '../data/chatStories';
 
 interface PhoneModalProps {
   stats: { strength: number; agility: number; mana: number; intellect: number };
@@ -29,10 +30,12 @@ interface PhoneModalProps {
   onStartDungeon: (dungeon: Dungeon) => void;
   loopCount: number;
   recordCount: number;
+  initialTab?: TabType;
   onClose: () => void;
+  playerName: string;
 }
 
-type TabType = 'status' | 'npc' | 'chat' | 'dungeon' | 'inventory' | 'records';
+export type TabType = 'status' | 'npc' | 'chat' | 'dungeon' | 'inventory' | 'records';
 
 export default function PhoneModal({
   stats,
@@ -50,13 +53,48 @@ export default function PhoneModal({
   onStartDungeon,
   loopCount,
   recordCount,
-  onClose
+  initialTab = 'status',
+  onClose,
+  playerName
 }: PhoneModalProps) {
-  const [activeTab, setActiveTab] = useState<TabType>('status');
+  const [activeTab, setActiveTab] = useState<TabType>(initialTab);
   const [selectedNpcId, setSelectedNpcId] = useState<string | null>(null);
   
-  // Chat messaging input
-  const [chatInputs, setChatInputs] = useState<Record<string, string>>({});
+  // Records section sub-tab: 'achievements' or 'logs'
+  const [recordsSubTab, setRecordsSubTab] = useState<'achievements' | 'logs'>(
+    initialTab === 'records' ? 'achievements' : 'logs'
+  );
+
+  // Dynamically evaluate achievements based on overall game data
+  const isAchievementUnlocked = (id: string) => {
+    switch (id) {
+      case 'first_death':
+        return loopCount > 1;
+      case 'loop_detective':
+        return recordCount >= 6;
+      case 's_class_bond':
+        return npcs.filter(n => n.id === 'baek' || n.id === 'geum' || n.id === 'lim').every(n => n.rapport >= 50);
+      case 'gold_star':
+        return gold >= 100000;
+      case 's_class_stat':
+        return (stats.strength >= 100 || stats.agility >= 100 || stats.mana >= 100 || stats.intellect >= 100);
+      case 'pilgrim_of_loops':
+        return loopCount >= 5;
+      case 'perfect_rapport':
+        return npcs.some(n => n.rapport >= 95);
+      case 'combat_god':
+        return totalPower >= 500;
+      case 'legendary_historian':
+        return recordCount >= 12;
+      case 'arsenal_master':
+        return inventory.length >= 6;
+      default:
+        return false;
+    }
+  };
+  
+  // Chat messaging typing simulator state
+  const [isTyping, setIsTyping] = useState<boolean>(false);
 
   // Combat power index calculation
   const totalPower = Math.floor(
@@ -73,89 +111,92 @@ export default function PhoneModal({
     return 'F급 [등급 보류]';
   };
 
-  // Chat message selection
-  const handleSendMessage = (npcId: string) => {
-    const input = chatInputs[npcId]?.trim();
-    if (!input) return;
+  // Check if any NPC has a pending message that needs user response
+  const hasPendingChats = npcs.some(npc => {
+    if (!npc.unlocked) return false;
+    const history = chatHistory[npc.id] || [];
+    const activeStory = getActiveStoryForNpc(npc.id, npc.rapport, recordCount, history);
+    return !!activeStory;
+  });
 
-    // Player message
+  // Background trigger effect: Automatically inject story NPC messages once unlocked
+  React.useEffect(() => {
+    let changed = false;
+    const updatedHistory = { ...chatHistory };
+    
+    npcs.forEach(npc => {
+      if (!npc.unlocked) return;
+      const history = updatedHistory[npc.id] || [];
+      const activeStory = getActiveStoryForNpc(npc.id, npc.rapport, recordCount, history);
+      if (activeStory) {
+        const lastTemplateMsg = activeStory.npcMessages[activeStory.npcMessages.length - 1];
+        const lastTemplateClean = lastTemplateMsg.replace(/\{playerName\}/g, '').replace(/유저/g, '').trim();
+        
+        const hasStoryMessages = history.some(msg => {
+          const cleanM = msg.text.replace(/\{playerName\}/g, '').replace(/유저/g, '').trim();
+          return cleanM.includes(lastTemplateClean) || lastTemplateClean.includes(cleanM);
+        });
+        
+        if (!hasStoryMessages) {
+          const newMsgs = activeStory.npcMessages.map(text => ({
+            sender: 'npc' as const,
+            text: text.replaceAll('{playerName}', playerName || '유저'),
+            timestamp: '메시지 도착'
+          }));
+          updatedHistory[npc.id] = [...history, ...newMsgs];
+          changed = true;
+        }
+      }
+    });
+    
+    if (changed) {
+      setChatHistory(updatedHistory);
+    }
+  }, [activeTab, npcs, recordCount, playerName]);
+
+  // Choice selector instead of typing
+  const handleSelectChoice = (npcId: string, story: ChatStory, choice: ChatStoryChoice) => {
+    if (isTyping) return;
+
     const playerMsg = {
       sender: 'player' as const,
-      text: input,
-      timestamp: `실시간`
+      text: choice.text.replaceAll('{playerName}', playerName || '유저'),
+      timestamp: '방금 전'
     };
 
-    // Update history
+    // Raise rapport
+    setNpcs(prev => prev.map(n => {
+      if (n.id === npcId) {
+        const nextRapport = Math.min(100, n.rapport + choice.rapportChange);
+        return {
+          ...n,
+          rapport: nextRapport,
+          isAlly: nextRapport >= 50
+        };
+      }
+      return n;
+    }));
+
     setChatHistory(prev => ({
       ...prev,
       [npcId]: [...(prev[npcId] || []), playerMsg]
     }));
 
-    setChatInputs(prev => ({ ...prev, [npcId]: '' }));
+    setIsTyping(true);
 
-    // Auto simulated response with rapport bump!
     setTimeout(() => {
-      let responseText = '...바빠서 가보겠다.';
-      let charge = 0;
-
-      if (npcId === 'baek') {
-        if (input.includes('서아') || input.includes('딸')) {
-          responseText = '...서아 이야기를 아는군. 꼬맹이치곤 기특한 걸 묻는다. 요즘은 그림 그리기를 좋아하지. 호감도가 들썩였다.';
-          charge = 8;
-        } else if (input.includes('훈련') || input.includes('스펙')) {
-          responseText = '몸이 가벼워질 때까지 게으름 피우지 말고 웨이트에 매진해라. 힘이 곧 네 갈비뼈를 아끼는 길이다.';
-          charge = 5;
-        } else {
-          responseText = '무슨 말을 하는지는 아직 이해 못 하겠군. 던전에서 다치지 마라.';
-          charge = 2;
-        }
-      } else if (npcId === 'geum') {
-        if (input.includes('마카롱') || input.includes('과자')) {
-          responseText = '꺄하하! 너 마카롱 살 줄 알아? 다음엔 피스타치오 맛으로 사 오라고! 그럼 아는 척 정도는 더 길게 해줄게!';
-          charge = 10;
-        } else if (input.includes('허접') || input.includes('꼬맹이')) {
-          responseText = '뭐어어?! 내가 왜 꼬맹이야! 난 S급 결계술사라고! 네가 훨씬 띨띨하면서 누구더러 꼬마래?!';
-          charge = 4;
-        } else {
-          responseText = '바보바보! 아무 대답도 마! 그냥 내가 구경해주는 것에 감사하란 말이야!';
-          charge = 3;
-        }
-      } else if (npcId === 'lim') {
-        if (input.includes('고서') || input.includes('기록') || input.includes('파편')) {
-          responseText = '아... 맞아요... 조각들을 분석해보면 세상의 마나 밀도가 100일 주기로 비정상적으로 소용돌이쳐요... 기묘합니다... 고마워요...';
-          charge = 12;
-        } else {
-          responseText = '...아... 저기... 낯선 사람이랑은 오래 문자를 주고받기가 좀 겁나요... 도서관으로 와서... 대화... 아니 문헌을 봐주세요...';
-          charge = 3;
-        }
-      }
-
-      // Raise rapport
-      setNpcs(prev => prev.map(n => {
-        if (n.id === npcId) {
-          const nextRapport = Math.min(100, n.rapport + charge);
-          return {
-            ...n,
-            rapport: nextRapport,
-            // unlock as ally if rapport >= 50
-            isAlly: nextRapport >= 50
-          };
-        }
-        return n;
-      }));
-
       const npcMsg = {
         sender: 'npc' as const,
-        text: responseText,
-        timestamp: `실시간`
+        text: choice.reply.replaceAll('{playerName}', playerName || '유저'),
+        timestamp: '실시간'
       };
 
       setChatHistory(prev => ({
         ...prev,
         [npcId]: [...(prev[npcId] || []), npcMsg]
       }));
-
-    }, 1000);
+      setIsTyping(false);
+    }, 1200);
   };
 
   // Buy item from inventory system
@@ -240,7 +281,7 @@ export default function PhoneModal({
                 setActiveTab(item.tab as TabType);
                 setSelectedNpcId(null);
               }}
-              className={`py-2 px-1 flex flex-col items-center justify-center transition-all cursor-pointer ${
+              className={`py-2 px-1 flex flex-col items-center justify-center transition-all cursor-pointer relative ${
                 isActive 
                   ? 'bg-zinc-950 text-blue-400 border-b-2 border-blue-500 shadow-inner font-bold font-display' 
                   : 'text-zinc-500 hover:text-zinc-350'
@@ -248,6 +289,9 @@ export default function PhoneModal({
             >
               <Icon className="w-5 h-5 mb-0.5" />
               <span className="text-xs font-bold">{item.label}</span>
+              {item.tab === 'chat' && hasPendingChats && (
+                <span className="absolute top-1.5 right-[18%] w-2.5 h-2.5 rounded-full bg-rose-500 animate-bounce border border-zinc-950" />
+              )}
             </button>
           );
         })}
@@ -273,7 +317,7 @@ export default function PhoneModal({
                 
                 <span className="text-xs text-zinc-500 font-mono uppercase tracking-wider font-bold">가설상 정체불량의 각성자</span>
                 <h3 className="text-base font-bold text-zinc-100 flex items-center gap-1.5 mt-1 font-display">
-                  박지후 <span className="text-xs bg-blue-950/40 text-blue-400 px-2 py-0.5 border border-blue-900/30 rounded font-mono font-bold">임시 대기</span>
+                  {playerName} <span className="text-xs bg-blue-950/40 text-blue-400 px-2 py-0.5 border border-blue-900/30 rounded font-mono font-bold">임시 대기</span>
                 </h3>
 
                 {/* Combata Index Indicator */}
@@ -296,11 +340,7 @@ export default function PhoneModal({
                   전사 전신 물리 파트 상태 (실시간 유효)
                 </span>
                 
-                {/* Specific Warn banner */}
-                <div className="p-3 bg-zinc-950 border border-zinc-850 rounded-xl text-xs text-zinc-400 leading-relaxed flex items-start gap-2 shadow-inner">
-                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-blue-400" />
-                  <span><strong>치명 부위 즉사 경보</strong>: 머리(Head)나 몸통(Torso)중 하나라도 HP가 0이 되는 즉시, 시간 연동 아카이브가 붕괴하여 현 타임라인은 되감기(배드엔딩) 처리됩니다.</span>
-                </div>
+                {/* Specific Warn banner removed per request */}
 
                 <div className="grid grid-cols-2 gap-3 mt-1.5">
                   {[
@@ -495,28 +535,41 @@ export default function PhoneModal({
                     </div>
                   ) : (
                     npcs.filter(n => n.unlocked).map((npc) => {
-                      const lastMsg = chatHistory[npc.id]?.slice(-1)[0];
+                      const npcHistory = chatHistory[npc.id] || [];
+                      const lastMsg = npcHistory.slice(-1)[0];
+                      const activeStory = getActiveStoryForNpc(npc.id, npc.rapport, recordCount, npcHistory);
+                      const isPending = !!activeStory;
+
                       return (
                         <button
                           key={npc.id}
                           onClick={() => setSelectedNpcId(npc.id)}
-                          className="p-3.5 bg-zinc-900 border border-zinc-800 rounded-xl text-left hover:border-blue-500/30 transition-all flex justify-between items-center shadow cursor-pointer active:scale-98"
+                          className={`p-3.5 bg-zinc-900 border rounded-xl text-left hover:border-blue-500/30 transition-all flex justify-between items-center shadow cursor-pointer active:scale-98 ${
+                            isPending ? 'border-rose-500/40 bg-zinc-900/90' : 'border-zinc-800'
+                          }`}
                         >
                           <div className="flex gap-3 items-center flex-1 min-w-0">
-                            <div className="w-10 h-10 rounded-xl bg-zinc-950 border border-zinc-850 flex items-center justify-center text-base shadow-inner">
+                            <div className="w-10 h-10 rounded-xl bg-zinc-950 border border-zinc-850 flex items-center justify-center text-base shadow-inner relative">
                               {npc.avatarUrl}
+                              {isPending && (
+                                <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-rose-500 animate-bounce border border-zinc-900" />
+                              )}
                             </div>
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2">
                                 <h4 className="font-bold text-sm text-zinc-200">{npc.name}</h4>
-                                <span className="text-[10px] bg-blue-950/40 text-blue-400 border border-blue-900/30 px-2 py-0.5 rounded font-mono font-bold uppercase tracking-wider">active</span>
+                                <span className={`text-[10px] border px-2 py-0.5 rounded font-mono font-bold uppercase tracking-wider ${
+                                  isPending ? 'bg-rose-950/40 text-rose-400 border-rose-900/30 animate-pulse' : 'bg-blue-950/40 text-blue-400 border-blue-900/30'
+                                }`}>
+                                  {isPending ? 'new alert' : 'active'}
+                                </span>
                               </div>
                               <p className="text-xs text-zinc-400 truncate mt-1 pr-4 font-sans font-medium">
-                                {lastMsg ? lastMsg.text : '대화 내역이 비어있습니다.'}
+                                {lastMsg ? lastMsg.text : '암호 채널이 동기화 대기 중입니다.'}
                               </p>
                             </div>
                           </div>
-                          <ChevronRight className="w-4 h-4 text-zinc-500 shrink-0" />
+                          <ChevronRight className={`w-4 h-4 shrink-0 transition-transform ${isPending ? 'text-rose-400 scale-105' : 'text-zinc-500'}`} />
                         </button>
                       );
                     })
@@ -527,6 +580,8 @@ export default function PhoneModal({
                   const npc = npcs.find(n => n.id === selectedNpcId);
                   const history = chatHistory[selectedNpcId] || [];
                   if (!npc) return null;
+
+                  const activeStory = getActiveStoryForNpc(npc.id, npc.rapport, recordCount, history);
 
                   return (
                     <div className="flex flex-col flex-1 overflow-hidden border border-zinc-800 rounded-2xl shadow-lg">
@@ -539,16 +594,16 @@ export default function PhoneModal({
                           ◀ 뒤로가기
                         </button>
                         <span className="text-xs font-bold font-mono text-zinc-200">{npc.name} (S급)</span>
-                        <span className="text-xs text-blue-400 font-mono font-bold bg-blue-950/20 px-2 py-0.5 rounded border border-blue-900/10">{npc.rapport}%</span>
+                        <span className="text-xs text-blue-400 font-mono font-bold bg-blue-950/20 px-2 py-0.5 rounded border border-blue-900/10">{npc.rapport}% 인연</span>
                       </div>
 
                       {/* Chat messages stream */}
                       <div className="flex-1 bg-zinc-950 p-3 overflow-y-auto flex flex-col gap-3 min-h-[180px]">
                         {history.length === 0 ? (
                           <div className="flex flex-col items-center justify-center p-6 text-center text-zinc-500 italic text-xs gap-2 font-sans font-medium h-full my-auto">
-                            <span className="text-lg">📡</span>
+                            <span className="text-lg animate-pulse">📡</span>
                             <span>국가 공인 보안 규약 암호 회선 동기화 완료.</span>
-                            <span className="text-[11px] not-italic text-zinc-600">"{npc.name}"님과의 직통 백도어 메신저 채널입니다. 대화를 입력해 인과 조율을 개시할 수 있습니다.</span>
+                            <span className="text-[11px] not-italic text-zinc-600">"{npc.name}"님과의 직통 백도어 메신저 채널입니다. 호감도와 기록 상태를 분석하여 인과 대화가 전파됩니다.</span>
                           </div>
                         ) : (
                           history.map((msg, idx) => {
@@ -556,43 +611,68 @@ export default function PhoneModal({
                             return (
                               <div 
                                 key={idx} 
-                                className={`flex flex-col max-w-[220px] rounded-xl p-2.5 leading-relaxed text-xs shadow-sm ${
+                                className={`flex flex-col max-w-[240px] rounded-xl p-2.5 leading-relaxed text-xs shadow-sm ${
                                   isMe 
                                     ? 'self-end bg-zinc-100 text-zinc-950 rounded-tr-none font-semibold' 
                                     : 'self-start bg-zinc-900 border border-zinc-800 text-zinc-200 rounded-tl-none font-medium'
                                 }`}
                               >
                                 {!isMe && (
-                                  <span className="text-[10px] text-blue-400 font-bold mb-1 font-mono">{npc.name}</span>
+                                  <span className="text-[10px] text-blue-450 font-extrabold mb-1 font-mono tracking-wide">{npc.name}</span>
                                 )}
-                                <p className="break-all font-sans">{msg.text}</p>
-                                <span className="text-[9px] text-zinc-500 font-mono text-right mt-1 block">
+                                <p className="break-all font-sans whitespace-pre-line">{msg.text}</p>
+                                <span className={`text-[8.5px] font-mono mt-1 block ${isMe ? 'text-zinc-500 text-right' : 'text-zinc-500'}`}>
                                   {msg.timestamp}
                                 </span>
                               </div>
                             );
                           })
                         )}
+
+                        {/* Animated Typing Indicator */}
+                        {isTyping && (
+                          <div className="self-start bg-zinc-900 border border-zinc-850 text-zinc-400 rounded-xl rounded-tl-none p-3.5 leading-relaxed text-xs shadow-sm flex flex-col gap-1.5 max-w-[200px]">
+                            <span className="text-[10px] text-blue-400 font-extrabold font-mono tracking-wider animate-pulse">{npc.name}</span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs animate-bounce font-mono">입력 중...</span>
+                              <div className="flex gap-1">
+                                <span className="w-1.5 h-1.5 rounded-full bg-zinc-500 animate-bounce [animation-delay:-0.3s]"></span>
+                                <span className="w-1.5 h-1.5 rounded-full bg-zinc-500 animate-bounce [animation-delay:-0.15s]"></span>
+                                <span className="w-1.5 h-1.5 rounded-full bg-zinc-500 animate-bounce"></span>
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </div>
 
-                      {/* Chat typing field form */}
-                      <div className="p-2.5 bg-zinc-900 border-t border-zinc-800 flex gap-2 shrink-0">
-                        <input
-                          type="text"
-                          value={chatInputs[selectedNpcId] || ''}
-                          onChange={(e) => setChatInputs({ ...chatInputs, [selectedNpcId]: e.target.value })}
-                          placeholder={
-                            '"기록" 또는 "고서" 키워드를 입력해봐요.'
-                          }
-                          onKeyDown={(e) => e.key === 'Enter' && handleSendMessage(selectedNpcId)}
-                          className="flex-1 bg-zinc-950 text-zinc-200 p-2.5 rounded-xl border border-zinc-800 text-xs focus:outline-none focus:border-blue-500 font-medium"
-                        />
-                        <button
-                          onClick={() => handleSendMessage(selectedNpcId)}
-                          className="bg-zinc-100 hover:bg-zinc-200 text-zinc-950 px-4 rounded-xl font-bold text-xs transition-transform active:scale-95 cursor-pointer font-bold"
-                        >
-                          입력
-                        </button>
+                      {/* Chat interactive replies selection instead of manual input keyboard */}
+                      <div className="p-3 bg-zinc-900 border-t border-zinc-800 shrink-0">
+                        {activeStory ? (
+                          <div className="flex flex-col gap-2">
+                            <div className="text-[10px] text-zinc-450 font-bold uppercase tracking-wider mb-1 flex items-center gap-1.5 font-mono">
+                              <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
+                              <span>인과율 조율 가능한 최적 답변 분기</span>
+                            </div>
+                            {activeStory.choices.map((choice) => (
+                              <button
+                                key={choice.id}
+                                disabled={isTyping}
+                                onClick={() => handleSelectChoice(npc.id, activeStory, choice)}
+                                className={`w-full p-3 bg-zinc-950 border border-zinc-800 hover:border-blue-500/50 hover:bg-zinc-900 text-left text-zinc-200 hover:text-blue-400 rounded-xl text-xs font-semibold leading-relaxed transition-all flex items-start gap-2.5 active:scale-[0.99] group shadow-inner ${
+                                  isTyping ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
+                                }`}
+                              >
+                                <CornerDownLeft className="w-4 h-4 text-zinc-500 group-hover:text-blue-400 shrink-0 mt-0.5" />
+                                <span className="flex-1 break-keep">{choice.text.replaceAll('{playerName}', playerName || '유저')}</span>
+                              </button>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="text-center p-3 text-zinc-500 font-medium text-xs leading-relaxed font-sans">
+                            📱 <span className="font-bold text-zinc-300">"{npc.name}"</span> 님과의 대화가 최신 상태입니다.<br />
+                            <span className="text-[10px] text-zinc-600 block mt-0.5">새로운 인과 장해(기록 파편)를 획득하거나 호감도를 높여 전파망을 복원하세요!</span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   );
@@ -742,7 +822,7 @@ export default function PhoneModal({
                 <div className="grid grid-cols-2 gap-3 mt-3">
                   <div className="p-2.5 bg-zinc-950 rounded-xl border border-zinc-850 text-center shadow-inner">
                     <span className="text-[10px] text-zinc-500 font-mono">해독 신호 노드</span>
-                    <div className="text-lg font-bold text-blue-400 font-mono mt-0.5">{recordCount} / 6 파일</div>
+                    <div className="text-lg font-bold text-blue-400 font-mono mt-0.5">{recordCount} / {FAIL_LOGS.length} 파일</div>
                   </div>
                   <div className="p-2.5 bg-zinc-950 rounded-xl border border-zinc-850 text-center shadow-inner">
                     <span className="text-[10px] text-zinc-500 font-mono">보안 동조화 수준</span>
@@ -751,36 +831,97 @@ export default function PhoneModal({
                 </div>
               </div>
 
-              {/* FAIL LOGS LIST (Immersive background story) */}
-              <span className="text-xs text-zinc-400 font-bold block mt-1.5 uppercase tracking-wide">💾 복원 완료된 국가 보안 기밀 보고서</span>
-              <div className="flex flex-col gap-2.5">
-                {FAIL_LOGS.map((log) => {
-                  const isUnlocked = recordCount >= log.id;
-                  return (
-                    <div
-                      key={log.id}
-                      className={`p-3.5 rounded-2xl border leading-relaxed shadow-sm transition-all ${
-                        isUnlocked 
-                          ? 'bg-zinc-900 border-zinc-805 text-zinc-200' 
-                          : 'bg-zinc-950/40 border-dashed border-zinc-850 text-zinc-500 select-none'
-                      }`}
-                    >
-                      <div className="flex items-center gap-1.5 mb-1.5 justify-between">
-                        <span className={`text-xs font-bold ${isUnlocked ? 'text-blue-400' : 'text-zinc-550'}`}>
-                          {log.title}
-                        </span>
-                        <span className="text-[10px] font-mono uppercase font-bold tracking-wider">
-                          {isUnlocked ? '🔓 기밀 해제' : '🔒 암호 차단'}
-                        </span>
-                      </div>
-                      <p className="text-xs leading-relaxed font-sans font-medium text-zinc-350">
-                        {isUnlocked ? log.text : '차원 심층 게이트 유물을 탐지 확보하여 기맥 암호를 추가 해독하십시오...'}
-                      </p>
-                    </div>
-                  );
-                })}
+              {/* Sub tab selector for records */}
+              <div className="grid grid-cols-2 gap-1 p-1 bg-zinc-900 border border-zinc-850 rounded-xl shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setRecordsSubTab('achievements')}
+                  className={`py-2 px-1 text-center font-bold text-xs rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                    recordsSubTab === 'achievements'
+                      ? 'bg-zinc-800 text-amber-400 shadow-sm font-semibold'
+                      : 'text-zinc-500 hover:text-zinc-350 font-medium'
+                  }`}
+                >
+                  <Award className="w-3.5 h-3.5" />
+                  <span>시스템 업적</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRecordsSubTab('logs')}
+                  className={`py-2 px-1 text-center font-bold text-xs rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                    recordsSubTab === 'logs'
+                      ? 'bg-zinc-800 text-blue-400 shadow-sm font-semibold'
+                      : 'text-zinc-500 hover:text-zinc-350 font-medium'
+                  }`}
+                >
+                  <Archive className="w-3.5 h-3.5" />
+                  <span>차원 기밀 보고</span>
+                </button>
               </div>
 
+              {recordsSubTab === 'achievements' ? (
+                <div className="flex flex-col gap-2.5 pb-4">
+                  <span className="text-xs text-zinc-400 font-bold block mt-1.5 uppercase tracking-wide">🏆 실시간 달성 가능한 시스템 시각화 도전 업적</span>
+                  {ACHIEVEMENTS.map((ach) => {
+                    const isUnlocked = isAchievementUnlocked(ach.id);
+                    return (
+                      <div
+                        key={ach.id}
+                        className={`p-3.5 rounded-2xl border leading-relaxed shadow-sm transition-all ${
+                          isUnlocked 
+                            ? 'bg-gradient-to-r from-zinc-900 to-amber-955/20 border-amber-500/30 text-amber-100' 
+                            : 'bg-zinc-950/45 border-zinc-800 border-dashed text-zinc-500'
+                        }`}
+                      >
+                        <div className="flex items-center gap-1.5 mb-1.5 justify-between">
+                          <span className={`text-xs font-bold flex items-center gap-1 ${isUnlocked ? 'text-amber-400' : 'text-zinc-550'}`}>
+                            {isUnlocked ? '⭐' : '⚙️'} {ach.title}
+                          </span>
+                          <span className={`text-[9px] font-mono uppercase font-bold tracking-wider px-2 py-0.5 rounded ${
+                            isUnlocked 
+                              ? 'bg-amber-950/40 border border-amber-800/40 text-amber-400 font-semibold' 
+                              : 'bg-zinc-900 border border-zinc-800 text-zinc-650'
+                          }`}>
+                            {isUnlocked ? 'COMPLETE' : 'LOCKED'}
+                          </span>
+                        </div>
+                        <p className={`text-xs font-sans leading-relaxed ${isUnlocked ? 'text-zinc-350' : 'text-zinc-500'}`}>
+                          {ach.description}
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="flex flex-col gap-2.5 pb-4">
+                  <span className="text-xs text-zinc-400 font-bold block mt-1.5 uppercase tracking-wide">💾 복원 완료된 국가 보안 기밀 보고서</span>
+                  {FAIL_LOGS.map((log) => {
+                    const isUnlocked = recordCount >= log.id;
+                    return (
+                      <div
+                        key={log.id}
+                        className={`p-3.5 rounded-2xl border leading-relaxed shadow-sm transition-all ${
+                          isUnlocked 
+                            ? 'bg-zinc-900 border-zinc-805 text-zinc-200' 
+                            : 'bg-zinc-950/40 border-dashed border-zinc-850 text-zinc-500 select-none'
+                        }`}
+                      >
+                        <div className="flex items-center gap-1.5 mb-1.5 justify-between">
+                          <span className={`text-xs font-bold ${isUnlocked ? 'text-blue-400' : 'text-zinc-550'}`}>
+                            {log.title}
+                          </span>
+                          <span className="text-[10px] font-mono uppercase font-bold tracking-wider">
+                            {isUnlocked ? '🔓 기밀 해제' : '🔒 암호 차단'}
+                          </span>
+                        </div>
+                        <p className="text-xs leading-relaxed font-sans font-medium text-zinc-350">
+                          {isUnlocked ? log.text : '차원 심층 게이트 유물을 탐지 확보하여 기맥 암호를 추가 해독하십시오...'}
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </motion.div>
           )}
 

@@ -14,6 +14,8 @@ export interface NpcEvent {
   destination: string;
   dialogue: string;
   choices: NpcChoice[];
+  minRapport?: number;
+  minRecords?: number;
 }
 
 export const NPC_EVENTS: NpcEvent[] = [
@@ -199,7 +201,9 @@ export const NPC_EVENTS: NpcEvent[] = [
         rapportChange: 20,
         reply: '백운혁이 당신의 눈동자를 가만히 들여다보더니 가볍게 콧방귀를 뀝니다. "...당치도 않은 F급의 망상이군. 하지만 묘하게 눈빛만큼은 허튼소리를 하는 모양새가 아니야. 흥미롭군." 호감도가 매우 크게 올랐습니다!'
       }
-    ]
+    ],
+    minRapport: 50,
+    minRecords: 2
   },
 
   // =========================================================================
@@ -251,7 +255,9 @@ export const NPC_EVENTS: NpcEvent[] = [
         rapportChange: 18,
         reply: '금채란이 당신의 소맷자락을 꾹 움켜쥐더니 얼굴을 붉힙니다. "허... 허언증도 정도껏 하라니까... 아저씨는 약하잖아... 그래도, 아주 조금은 안심이 될지도..." 인연의 봉인이 완전히 느슨해졌습니다.'
       }
-    ]
+    ],
+    minRapport: 40,
+    minRecords: 1
   },
   {
     npcId: 'geum',
@@ -375,7 +381,9 @@ export const NPC_EVENTS: NpcEvent[] = [
         rapportChange: 22,
         reply: '채란의 눈가에 잠시 이슬이 맺혔다가, 이내 툭 털어내며 큰 소리로 웃어 보입니다. "바, 바보 아저씨! 감투가 너무 과하잖아! 그래도... 약속 어기면 내 최강 마법으로 지구 끝까지 추적해서 구워 버릴 테니 각오하라고!"'
       }
-    ]
+    ],
+    minRapport: 60,
+    minRecords: 3
   },
 
   // =========================================================================
@@ -410,7 +418,9 @@ export const NPC_EVENTS: NpcEvent[] = [
         reply: '임소연의 소심한 눈빛 속에 돌연 강박적인 불꽃이 타오릅니다. "그렇군요... 제 연역 계산식의 기묘한 시공 뒤틀림 오차가 실재했던 겁니다... 기록 파편들을 더 주시면, 해답을 유추할게요!" 게이트와 이 세계 시공간의 숨겨진 음모에 한 걸음 다가섰습니다.',
         actions: ['collect_record']
       }
-    ]
+    ],
+    minRapport: 30,
+    minRecords: 1
   },
   {
     npcId: 'lim',
@@ -536,6 +546,8 @@ export const NPC_EVENTS: NpcEvent[] = [
         rapportChange: 22,
         reply: '임소연의 어깨 떨림이 이내 멎으며, 평온하고도 단단한 눈빛으로 미소를 흘립니다. "...네, 지후 씨가 이끄는 변수라면... 제 불능의 기하 연산식도 기어이 기적의 등식을 증명해 낼 것입니다. 함께 가요." 인류 생존 수식 성립의 확신을 획득했습니다.'
       }
-    ]
+    ],
+    minRapport: 60,
+    minRecords: 4
   }
 ];

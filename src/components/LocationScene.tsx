@@ -33,6 +33,9 @@ interface LocationSceneProps {
   setNpcs: React.Dispatch<React.SetStateAction<Npc[]>>;
   onAdvancePhase: () => void;
   onCollectRecord: () => void;
+  recordCount: number;
+  playerName: string;
+  dDay: number;
 }
 
 type DestinationType = 'training' | 'recovery' | 'job' | 'store';
@@ -50,7 +53,10 @@ export default function LocationScene({
   npcs,
   setNpcs,
   onAdvancePhase,
-  onCollectRecord
+  onCollectRecord,
+  recordCount,
+  playerName,
+  dDay
 }: LocationSceneProps) {
   const [selectedDest, setSelectedDest] = useState<DestinationType | null>(null);
   const [mapModalOpen, setMapModalOpen] = useState<boolean>(false);
@@ -61,6 +67,37 @@ export default function LocationScene({
   } | null>(null);
 
   const [narrativeFeedback, setNarrativeFeedback] = useState<string | null>(null);
+
+  // Urgency thresholds for D-Day
+  const isSlightlyRed = dDay <= 50 && dDay > 30;
+  const isModeratelyRed = dDay <= 30 && dDay > 10;
+  const isCriticallyRed = dDay <= 10;
+
+  // Dynamic Title & Description based on dDay and phase
+  let defaultTitle = '세상이 S급 각성자의 길을 묻습니다';
+  let defaultDesc = '체계적인 한계 매니지먼트만이 100일 뒤 출현할 서울 종말 급 가야 게이트 소멸의 진실을 푸는 전조가 됩니다.';
+
+  if (isCriticallyRed) {
+    defaultTitle = `🚨 종말의 피빛 하늘 (D-${dDay})`;
+    defaultDesc = `시공 장벽 수치가 완전히 무너져 붉은 안개가 강남 거리를 집어삼킵니다. 백운혁, 금채란, 임소연과 인과율 동기화를 마치고 당장 결사 전선에 참전하십시오!`;
+  } else if (isModeratelyRed) {
+    defaultTitle = `⚠️ 차원 구속 요동 발생 (D-${dDay})`;
+    defaultDesc = `마나 가습 밀도가 급격히 팽창해 하늘이 탁한 적동색으로 변하고 있습니다. 상급 험난 게이트들이 일평균 빈도수 수준을 넘어 동시다발적으로 개문됩니다.`;
+  } else if (isSlightlyRed) {
+    defaultTitle = `⚠️ 변곡의 조짐 감지 (D-${dDay})`;
+    defaultDesc = `공기 중에 비릿한 마력 탄내가 섞여 흩날립니다. 저 먼 한계선 너머 파멸의 눈빛이 차원의 조그만 빈틈을 비집고 이 도시 서울을 탐색하기 시작합니다.`;
+  } else {
+    if (phase === '아침') {
+      defaultTitle = '🌅 고요가 퍼지는 서울의 아침 일과';
+      defaultDesc = '아침 이슬 아래 평화로운 거리에 새들이 지저귀는 맑고 따스한 소리가 들려옵니다. 상쾌한 마나를 조율하여 오늘 하루의 수련을 기틀 삼아 갈 최선의 흐름입니다.';
+    } else if (phase === '점심') {
+      defaultTitle = '☀️ 나른하고 선명히 내리쬐는 정오';
+      defaultDesc = '강남 대로 주변의 헌터 상단과 각성인 무리가 활기차게 장비를 거래합니다. 신체를 충분히 보강하여 상급 균열에 무사 안착할 대비를 하십시오.';
+    } else if (phase === '저녁') {
+      defaultTitle = '🌉 어스름이 사르르 내려앉는 서울의 황혼';
+      defaultDesc = '노을빛이 아름답게 스러지고 도심 곳곳의 마력 가로등이 정답게 점등됩니다. 동료들과의 메신저 채널을 점검하고, 조율의 기록을 매듭지으며 내일을 기약할 밤이 옵니다.';
+    }
+  }
 
   // Trigger NPC Event probability check upon selecting destination
   const handleDestinationAction = (dest: DestinationType) => {
@@ -82,26 +119,67 @@ export default function LocationScene({
   };
 
   const triggerNpcDialogue = (npc: Npc, dest: DestinationType) => {
-    const matchedEvent = NPC_EVENTS.find(e => e.npcId === npc.id && e.destination === dest);
+    // 1. Filter all matching events the player qualifies for
+    const qualifiedEvents = NPC_EVENTS.filter(e => {
+      if (e.npcId !== npc.id || e.destination !== dest) return false;
+      
+      // Check minimum rapport threshold if defined
+      if (e.minRapport !== undefined && npc.rapport < e.minRapport) return false;
+      
+      // Check minimum records/files threshold if defined
+      if (e.minRecords !== undefined && recordCount < e.minRecords) return false;
+      
+      return true;
+    });
+
     let dialogue = '';
     let choices: NpcChoice[] = [];
 
-    if (matchedEvent) {
+    if (qualifiedEvents.length > 0) {
+      // Pick the event with the highest minRapport / minRecords to show the most advanced qualified conversation
+      qualifiedEvents.sort((a, b) => {
+        const rapportA = a.minRapport || 0;
+        const rapportB = b.minRapport || 0;
+        if (rapportA !== rapportB) return rapportB - rapportA; // Descending
+        
+        const recordsA = a.minRecords || 0;
+        const recordsB = b.minRecords || 0;
+        return recordsB - recordsA; // Descending
+      });
+
+      const matchedEvent = qualifiedEvents[0];
       dialogue = matchedEvent.dialogue;
       choices = matchedEvent.choices;
     } else {
-      // Default Fallback
-      dialogue = `${npc.name}이(가) 가볍게 눈인사를 건네며 지나갑니다. "좋은 하루입니다."`;
+      // Default Fallback that changes realistically depending on rapport
+      if (npc.rapport >= 50) {
+        dialogue = `${npc.name}이(가) 환하게 반기며 머뭇거립니다. "${playerName} 씨, 마침 만나고 싶었습니다. 오늘도 안전하고 훌륭한 하루 보내세요."`;
+      } else {
+        dialogue = `${npc.name}이(가) 가볍게 목인사를 건네며 지나갑니다. "좋은 하루입니다, ${playerName} 씨."`;
+      }
       choices = [
         {
-          text: '"네, 선배님도 좋은 헌팅 되십시오."',
+          text: `"네, 선배님도 좋은 헌팅 되십시오."`,
           rapportChange: 4,
           reply: '서로 가볍게 덕담을 나누었습니다.'
         }
       ];
     }
 
-    setActiveNpcEvent({ npc, dialogue, choices });
+    // Helper to dynamically replace hardcoded player names with the user-defined name
+    const replaceName = (str: string): string => {
+      if (!str) return '';
+      return str.replaceAll('박지후', playerName || '유저').replaceAll('지후', playerName || '유저');
+    };
+
+    const processedDialogue = replaceName(dialogue);
+    const processedChoices = choices.map(choice => ({
+      ...choice,
+      text: replaceName(choice.text),
+      reply: replaceName(choice.reply)
+    }));
+
+    setActiveNpcEvent({ npc, dialogue: processedDialogue, choices: processedChoices });
   };
 
   const handleChoiceSelect = (choice: NpcChoice) => {
@@ -179,36 +257,84 @@ export default function LocationScene({
   };
 
   return (
-    <div className="flex flex-col flex-1 p-3 md:p-4 gap-3 text-zinc-100 overflow-y-auto text-sm max-h-full relative scrollbar-thin">
+    <div className={`flex flex-col flex-1 p-3 md:p-4 gap-3 text-zinc-100 overflow-y-auto text-sm max-h-full relative scrollbar-thin transition-colors duration-1000 ${
+      isCriticallyRed 
+        ? 'bg-gradient-to-b from-rose-950/15 to-zinc-950 shadow-[inset_0_0_50px_rgba(244,63,94,0.08)]' 
+        : isModeratelyRed 
+        ? 'bg-gradient-to-b from-rose-950/5 to-zinc-950 shadow-[inset_0_0_30px_rgba(244,63,94,0.03)]'
+        : isSlightlyRed
+        ? 'bg-gradient-to-b from-orange-950/5 to-zinc-950'
+        : ''
+    }`}>
       
       {/* SCENARIO LOCATION ILLUSTRATIONS CARD (Sleek Display style) */}
-      <div className="h-[120px] md:h-[140px] bg-gradient-to-b from-zinc-900 to-zinc-950 rounded-2xl border border-zinc-805 relative overflow-hidden flex flex-col justify-end p-4 md:p-5 shrink-0 shadow-lg">
+      <div className={`h-[120px] md:h-[140px] relative overflow-hidden flex flex-col justify-end p-4 md:p-5 shrink-0 shadow-lg rounded-2xl border transition-all duration-1000 ${
+        isCriticallyRed 
+          ? 'border-rose-500/50 shadow-[0_0_15px_rgba(244,63,94,0.15)] bg-gradient-to-b from-zinc-900 via-rose-950/30 to-rose-950/40'
+          : isModeratelyRed 
+          ? 'border-rose-900/40 bg-gradient-to-b from-zinc-900 via-rose-950/10 to-rose-950/20'
+          : isSlightlyRed 
+          ? 'border-orange-900/30 bg-gradient-to-b from-zinc-900 via-orange-950/5 to-orange-950/10'
+          : 'border-zinc-805 bg-gradient-to-b from-zinc-900 to-zinc-950'
+      }`}>
         
-        {/* Radial blue fade glowing spotlight */}
-        <div className="absolute inset-0 opacity-15 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-blue-400 via-transparent to-transparent pointer-events-none"></div>
+        {/* Radial fade glowing spotlight based on urgency */}
+        <div className={`absolute inset-0 opacity-20 pointer-events-none transition-all duration-1000 ${
+          isCriticallyRed
+            ? 'bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-rose-600 via-transparent to-transparent'
+            : isModeratelyRed
+            ? 'bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-rose-700/60 via-transparent to-transparent'
+            : isSlightlyRed
+            ? 'bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-orange-600/40 via-transparent to-transparent'
+            : 'bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-blue-400 via-transparent to-transparent'
+        }`}></div>
 
         {/* Status indicator dot */}
-        <div className="absolute top-3 right-3 md:top-4 md:right-4 p-1 px-2 bg-zinc-950/90 border border-zinc-850 rounded-lg font-mono text-[10px] text-blue-400 font-bold uppercase tracking-widest flex items-center gap-1.5 shadow-sm">
-          <span className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-ping"></span>
-          <span>SEOUL SECURED NETWORK</span>
+        <div className={`absolute top-3 right-3 md:top-4 md:right-4 p-1 px-2 rounded-lg font-mono text-[10px] uppercase tracking-widest flex items-center gap-1.5 shadow-sm border transition-all duration-700 ${
+          isCriticallyRed
+            ? 'bg-rose-950/90 text-rose-400 border-rose-500/30 font-extrabold'
+            : isModeratelyRed
+            ? 'bg-rose-950/70 text-rose-400 border-rose-900/30 font-bold'
+            : isSlightlyRed
+            ? 'bg-orange-950/60 text-orange-400 border-orange-900/30'
+            : 'bg-zinc-950/90 text-blue-400 border-zinc-850 font-bold'
+        }`}>
+          <span className={`w-1.5 h-1.5 rounded-full animate-ping ${
+            isCriticallyRed || isModeratelyRed ? 'bg-rose-500' : isSlightlyRed ? 'bg-orange-500' : 'bg-blue-500'
+          }`}></span>
+          <span>
+            {isCriticallyRed
+              ? '🛑 COLLAPSE DETECTED'
+              : isModeratelyRed
+              ? '⚠️ CRITICAL ANOMALY'
+              : isSlightlyRed
+              ? '⚠️ INSTABILITY REPORTED'
+              : 'SEOUL SECURED NETWORK'}
+          </span>
         </div>
 
         <div className="z-10 flex flex-col gap-1.5 pr-6">
-          <span className="text-[10px] md:text-xs uppercase font-mono text-zinc-400 flex items-center gap-1.5 font-bold tracking-widest">
-            <MapPin className="w-3.5 h-3.5 text-blue-500" />
+          <span className={`text-[10px] md:text-xs uppercase font-mono flex items-center gap-1.5 font-bold tracking-widest transition-colors ${
+            isCriticallyRed || isModeratelyRed ? 'text-rose-400' : isSlightlyRed ? 'text-orange-400' : 'text-zinc-400'
+          }`}>
+            <MapPin className={`w-3.5 h-3.5 ${
+              isCriticallyRed || isModeratelyRed ? 'text-rose-500' : isSlightlyRed ? 'text-orange-500' : 'text-blue-500'
+            }`} />
             서울 {phase} 페이즈 활동 구역
           </span>
-          <h3 className="text-xs md:text-sm font-bold text-zinc-100 font-display tracking-tight leading-none uppercase italic">
+          <h3 className={`text-xs md:text-sm font-bold font-display tracking-tight leading-none uppercase italic transition-colors ${
+            isCriticallyRed ? 'text-rose-400 font-extrabold' : 'text-zinc-100'
+          }`}>
             {selectedDest === 'training' && '강남 공인 헌터 수련관'}
             {selectedDest === 'recovery' && '서울역 각성 메디컬 가습센터'}
             {selectedDest === 'job' && '건대입구 파트타임 자원 분류소'}
-            {!selectedDest && '세상이 S급 각성자의 길을 묻습니다'}
+            {!selectedDest && defaultTitle}
           </h3>
           <p className="text-[10px] md:text-xs text-zinc-400 font-sans leading-normal break-keep">
             {selectedDest === 'training' && '근지구력 가중 모래주머니와 특수 마정석 가상 훈련단이 상시 교전 준비 및 배치되어 있습니다.'}
             {selectedDest === 'recovery' && '특수 수화 요실 정화 팩과 요양용 캡슐 안치실이 가동되어 전신 상흔 완치를 보조합니다.'}
             {selectedDest === 'job' && '긴급 수송용 보급 분류 야간 알바를 소정 교대해 위험 합의금을 실시간 정산 수호합니다.'}
-            {!selectedDest && '체계적인 한계 매니지먼트만이 100일 뒤 출현할 서울 종말 급 가야 게이트 소멸의 진실을 푸는 전조가 됩니다.'}
+            {!selectedDest && defaultDesc}
           </p>
         </div>
       </div>

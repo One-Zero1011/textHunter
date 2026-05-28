@@ -27,6 +27,7 @@ interface DungeonPlayProps {
   onFinishDungeon: (success: boolean, loot: string[], logText: string) => void;
   onDie: () => void;
   onCollectRecord: () => void;
+  playerName?: string;
 }
 
 export default function DungeonPlay({
@@ -42,7 +43,8 @@ export default function DungeonPlay({
   inventory,
   onFinishDungeon,
   onDie,
-  onCollectRecord
+  onCollectRecord,
+  playerName
 }: DungeonPlayProps) {
   // Setup Non-Linear Graph Map
   const [grid, setGrid] = useState<GridRoom[]>([]);
@@ -167,7 +169,7 @@ export default function DungeonPlay({
           }));
           logs.push(`[치유] 전사 파트별 체력이 +25씩 고루 치유되었습니다.`);
         } else {
-          logs.push(`📜 과거 차원 속에 고이 파묻힌 시체의 흔적... 당신의 이름 "박지후"가 새겨진 부러진 단검입니다.`);
+          logs.push(`📜 과거 차원 속에 고이 파묻힌 시체의 흔적... 당신의 이름 "${playerName || '유저'}"가 새겨진 부러진 단검입니다.`);
           logs.push(`기이한 기시감에 머리가 아파옵니다. "이 죽음은 벌써 수백 마흔 번째야..."`);
           onCollectRecord();
         }
@@ -245,7 +247,7 @@ export default function DungeonPlay({
 
     const initialLogs: CombatLog[] = [
       { id: '1', text: `⚔️ 위험 경보! 강력한 적 [${name}]을(를) 조우했습니다!`, type: 'system' },
-      { id: '2', text: `🏃 선공 순서가 정해졌습니다: ${sortedOrder.map(id => id === 'player' ? '박지후(나)' : id === 'enemy' ? '몬스터' : allies.find(a => a.id === id)?.name).join(' ➔ ')}`, type: 'system' }
+      { id: '2', text: `🏃 선공 순서가 정해졌습니다: ${sortedOrder.map(id => id === 'player' ? `${playerName || '유저'}(나)` : id === 'enemy' ? '몬스터' : allies.find(a => a.id === id)?.name).join(' ➔ ')}`, type: 'system' }
     ];
     setCombatLogs(initialLogs);
 
@@ -787,7 +789,7 @@ export default function DungeonPlay({
               <div className="flex-1 p-1 px-2 border border-rose-500/30 bg-rose-950/10 rounded flex items-center gap-1.5">
                 <span className="text-xs">🧑‍🚀</span>
                 <div>
-                  <div className="font-bold text-[9px]">박지후 (나)</div>
+                  <div className="font-bold text-[9px]">{playerName || '기록'} (나)</div>
                   <div className="text-[8px] text-rose-400 font-mono">F급 대변인</div>
                 </div>
               </div>
@@ -817,7 +819,7 @@ export default function DungeonPlay({
           <div className="flex justify-between items-center bg-neutral-900 border border-neutral-800 px-3 py-1.5 rounded-lg text-[10px]">
             <span className="font-mono text-emerald-400 font-bold">TURN {turn}</span>
             <span className="text-neutral-400 font-semibold">
-              현재 행동 순서: <span className="text-amber-400">{currentTurnEntity === 'player' ? '박지후 (나!)' : currentTurnEntity === 'enemy' ? '몬스터' : allies.find(a => a.id === currentTurnEntity)?.name}</span>
+              현재 행동 순서: <span className="text-amber-400">{currentTurnEntity === 'player' ? `${playerName || '유저'} (나!)` : currentTurnEntity === 'enemy' ? '몬스터' : allies.find(a => a.id === currentTurnEntity)?.name}</span>
             </span>
           </div>
 
@@ -830,7 +832,7 @@ export default function DungeonPlay({
               {/* Player HP */}
               <div className="p-1 px-1.5 bg-neutral-900/80 rounded border border-neutral-800">
                 <div className="flex justify-between font-mono text-[9.5px] mb-0.5">
-                  <span className="font-bold">박지후 (나)</span>
+                  <span className="font-bold">{playerName || '유저'} (나)</span>
                   <span className="text-rose-400">몸통 {bodyPartsHP.torso}/100</span>
                 </div>
                 {/* Health bars */}

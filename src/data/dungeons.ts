@@ -222,18 +222,31 @@ export function generateRandomDungeon(rank: string, id: string): Dungeon {
   };
 }
 
-export function generateRandomDungeonsList(count: number): Dungeon[] {
+export function generateRandomDungeonsList(count: number, dDay: number = 100): Dungeon[] {
   const list: Dungeon[] = [];
   const ranks = ['F급', 'E급', 'D급', 'C급', 'B급', 'A급', 'S급'];
-  // 가중치 비율 분배: F(40%), E(25%), D(15%), C(10%), B(6%), A(3%), S(1%)
-  const weights = [0.40, 0.25, 0.15, 0.10, 0.06, 0.03, 0.01];
+  
+  // Calculate urgency based on 100 - dDay (ranges from 0 to 100)
+  const urgency = Math.max(0, Math.min(100, 100 - dDay));
+  const ratio = urgency / 100; // 0.0 to 1.0
+
+  // As d-day approaches 0, higher rank dungeons spawn much more frequently
+  const baseWeights = [0.40, 0.25, 0.15, 0.10, 0.06, 0.03, 0.01];
+  const endWeights = [0.05, 0.10, 0.15, 0.20, 0.25, 0.15, 0.10];
+  
+  const weights = baseWeights.map((w, idx) => {
+    return w * (1 - ratio) + endWeights[idx] * ratio;
+  });
+  
+  const totalWeight = weights.reduce((sum, w) => sum + w, 0);
+  const normalizedWeights = weights.map(w => w / totalWeight);
 
   for (let i = 0; i < count; i++) {
     const r = Math.random();
     let selectedRank = 'F급';
     let cumulative = 0;
     for (let j = 0; j < ranks.length; j++) {
-      cumulative += weights[j];
+      cumulative += normalizedWeights[j];
       if (r <= cumulative) {
         selectedRank = ranks[j];
         break;

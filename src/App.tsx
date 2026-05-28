@@ -12,9 +12,14 @@ import {
   INITIAL_CHAT_HISTORY, FAIL_LOGS, generateRandomDungeonsList
 } from './data';
 import DungeonPlay from './components/DungeonPlay';
-import PhoneModal from './components/PhoneModal';
+import PhoneModal, { TabType } from './components/PhoneModal';
 import GameIntro from './components/GameIntro';
 import LocationScene from './components/LocationScene';
+import MainMenu from './components/MainMenu';
+import LauncherScreen from './components/LauncherScreen';
+import EndingScreen from './components/EndingScreen';
+import SettingsModal from './components/SettingsModal';
+import { getActiveStoryForNpc } from './data/chatStories';
 import { 
   Smartphone, Award, Heart, HelpCircle, Shield, Sparkles, 
   Settings, Zap, Swords, RotateCcw, AlertTriangle, ShieldCheck, Gamepad2, FolderOpen
@@ -26,6 +31,7 @@ import logoImg from '../images/Logo.png';
 export default function App() {
   // Game state
   const [playerName, setPlayerName] = useState<string>('유저');
+  const [onLauncher, setOnLauncher] = useState<boolean>(true);
   const [gameStarted, setGameStarted] = useState<boolean>(false);
   const [introActive, setIntroActive] = useState<boolean>(false);
   const [loopCount, setLoopCount] = useState<number>(1);
@@ -66,6 +72,7 @@ export default function App() {
   const [activeDungeon, setActiveDungeon] = useState<Dungeon | null>(null);
   const [availableDungeons, setAvailableDungeons] = useState<Dungeon[]>([]);
   const [phoneOpen, setPhoneOpen] = useState<boolean>(false);
+  const [phoneActiveTab, setPhoneActiveTab] = useState<TabType>('status');
   const [settingsOpen, setSettingsOpen] = useState<boolean>(false);
   const [endingType, setEndingType] = useState<'dead' | 'world_destroyed' | 'normal' | 'happy' | null>(null);
 
@@ -77,6 +84,14 @@ export default function App() {
 
   // Log summary
   const [lobbyFeedback, setLobbyFeedback] = useState<string>('오늘 하루도 무사히 각성하여 성장하십시오.');
+
+  // Dynamic pending chat count check for alert badges
+  const hasPendingChats = npcs.some(npc => {
+    if (!npc.unlocked) return false;
+    const history = chatHistory[npc.id] || [];
+    const activeStory = getActiveStoryForNpc(npc.id, npc.rapport, recordCount, history);
+    return !!activeStory;
+  });
 
   // Save/Load System
   const saveGameStateReal = (override?: { dDay?: number; phaseIndex?: number; fatigue?: number }) => {
@@ -130,6 +145,7 @@ export default function App() {
       
       setGameStarted(true);
       setIntroActive(false);
+      setOnLauncher(false);
       setSettingsOpen(false);
       setLobbyFeedback(`📁 시공 보존 슬롯을 무사히 복구했습니다. (D-${data.dDay} ${phases[data.phaseIndex] || '아침'})`);
     } catch (e) {
@@ -172,6 +188,7 @@ export default function App() {
     setAvailableDungeons([]);
     setSettingsOpen(false);
     setHasSave(false);
+    setOnLauncher(true);
     setLobbyFeedback('♻️ 시뮬레이터가 완치된 초기 각인 상태로 역행 설정되었습니다.');
   };
 
@@ -204,7 +221,7 @@ export default function App() {
 
         if (updatedList.length < maxSlots) {
           const needed = maxSlots - updatedList.length;
-          const newDungeons = generateRandomDungeonsList(needed);
+          const newDungeons = generateRandomDungeonsList(needed, nextDValue);
           return [...updatedList, ...newDungeons];
         }
         if (updatedList.length > maxSlots) {
@@ -241,7 +258,7 @@ export default function App() {
   // Initialize dynamic dungeons pool on startup
   useEffect(() => {
     if (gameStarted) {
-      setAvailableDungeons(generateRandomDungeonsList(3));
+      setAvailableDungeons(generateRandomDungeonsList(3, dDay));
     }
   }, [gameStarted]);
 
@@ -299,7 +316,7 @@ export default function App() {
       // 3. Fill missing slots if current count is less than maxSlots
       if (updatedList.length < maxSlots) {
         const needed = maxSlots - updatedList.length;
-        const newDungeons = generateRandomDungeonsList(needed);
+        const newDungeons = generateRandomDungeonsList(needed, prospectiveDDayVal);
         return [...updatedList, ...newDungeons];
       }
 
@@ -406,11 +423,11 @@ export default function App() {
     setEndingType(null);
     setIntroActive(true); // show intro cinematic reflecting loop count
     setLobbyFeedback(`⏳ 끈질긴 영혼의 외침 속에 시간이 되감겼습니다... 억겁 #${loopCount+1}경로 돌입.`);
-    setAvailableDungeons(generateRandomDungeonsList(3));
+    setAvailableDungeons(generateRandomDungeonsList(3, 100));
   };
 
   const handleCollectRecord = () => {
-    setRecordCount(prev => Math.min(6, prev + 1));
+    setRecordCount(prev => Math.min(FAIL_LOGS.length, prev + 1));
   };
 
   const totalCP = (stats.strength * 12) + (stats.agility * 8) + (stats.mana * 10) + (stats.intellect * 5);
@@ -431,59 +448,34 @@ export default function App() {
       >
 
         {/* 1. STATE SCREEN: INITIAL LANDING MENU */}
-        {!gameStarted && (
-          <div className="absolute inset-0 z-50 bg-zinc-950 flex flex-col justify-between p-6 md:p-10 overflow-hidden">
-            
-            {/* Visual game title */}
-            <div className="flex-grow flex flex-col justify-center items-center gap-4 mt-6 md:mt-10">
-              <div className="relative max-w-[380px] sm:max-w-[460px] md:max-w-[500px] w-full aspect-square flex items-center justify-center">
-                {/* Clean soft ambient glow behind the logo */}
-                <div className="absolute inset-4 rounded-full bg-blue-500/10 blur-2xl animate-pulse"></div>
-                <img 
-                  src={logoImg} 
-                  alt="등급 보류 : F급 헌터" 
-                  referrerPolicy="no-referrer"
-                  className="relative z-10 w-full h-auto object-contain drop-shadow-[0_0_35px_rgba(59,130,246,0.2)]"
-                />
-              </div>
+        {!gameStarted && onLauncher && (
+          <LauncherScreen
+            playerName={playerName}
+            loopCount={loopCount}
+            recordCount={recordCount}
+            logoImg={logoImg}
+            onSelectMainGame={() => {
+              setGameStarted(true);
+              setIntroActive(true);
+              setOnLauncher(false);
+            }}
+            setPlayerName={setPlayerName}
+          />
+        )}
 
-              {/* Name custom inputs */}
-              <div className="w-full max-w-sm mt-8 flex flex-col gap-2">
-                <label className="text-xs font-mono text-zinc-400 uppercase tracking-widest pl-1">헌터 신원 기재 (이름)</label>
-                <input 
-                  type="text" 
-                  value={playerName}
-                  onChange={(e) => setPlayerName(e.target.value.slice(0, 10))}
-                  placeholder="헌터 이름을 기재하세요..."
-                  className="w-full bg-zinc-900 text-zinc-100 border border-zinc-800 hover:border-zinc-700 focus:border-blue-500 rounded-xl p-4 text-sm text-center focus:outline-none font-sans font-bold shadow-inner transition-colors"
-                />
-              </div>
-            </div>
-
-            {/* Launch Action */}
-            <div className="mb-6 flex flex-col items-center gap-3 w-full max-w-sm mx-auto">
-              <button
-                onClick={() => {
-                  setGameStarted(true);
-                  setIntroActive(true);
-                }}
-                className="w-full py-4.5 bg-zinc-100 hover:bg-white text-zinc-950 font-bold rounded-xl active:scale-95 transition-all uppercase text-sm tracking-widest flex items-center justify-center gap-2 shadow-xl cursor-pointer"
-              >
-                <Gamepad2 className="w-5 h-5 text-zinc-950" />
-                <span>등급 측정</span>
-              </button>
-
-              {hasSave && (
-                <button
-                  onClick={loadGameState}
-                  className="w-full py-4.5 bg-zinc-900 border border-zinc-800 hover:border-zinc-700 text-blue-400 hover:text-blue-300 font-bold rounded-xl active:scale-95 transition-all text-sm tracking-wide flex items-center justify-center gap-2 shadow-xl cursor-pointer"
-                >
-                  <FolderOpen className="w-5 h-5" />
-                  <span>저장된 기록 불러오기</span>
-                </button>
-              )}
-            </div>
-          </div>
+        {!gameStarted && !onLauncher && (
+          <MainMenu
+            playerName={playerName}
+            setPlayerName={setPlayerName}
+            hasSave={hasSave}
+            onStartGame={() => {
+              setGameStarted(true);
+              setIntroActive(true);
+            }}
+            onLoadGame={loadGameState}
+            logoImg={logoImg}
+            onBackToLauncher={() => setOnLauncher(true)}
+          />
         )}
 
         {/* 2. STATE SCREEN: PLOT STORY INTROS */}
@@ -510,11 +502,25 @@ export default function App() {
             onFinishDungeon={handleFinishDungeon}
             onDie={handleDie}
             onCollectRecord={handleCollectRecord}
+            playerName={playerName}
           />
         )}
 
         {/* 4. STATE SCREEN: ENCOUNTERED DEFEAT/DEAD LIMIT (Rewind Loop) */}
         {gameStarted && !introActive && endingType && (
+          <EndingScreen
+            endingType={endingType}
+            loopCount={loopCount}
+            recordCount={recordCount}
+            handleRewindLoop={handleRewindLoop}
+            resetGameState={resetGameState}
+            setGameStarted={setGameStarted}
+            setEndingType={setEndingType}
+            setRecordCount={setRecordCount}
+            setOnLauncher={setOnLauncher}
+          />
+        )}
+        {false && gameStarted && !introActive && endingType && (
           <div className="absolute inset-0 z-50 bg-zinc-950 text-zinc-100 flex flex-col justify-between p-6 md:p-10 overflow-hidden">
             
             <div className="flex-grow flex flex-col justify-center items-center gap-5 text-center mt-8 pb-6">
@@ -663,7 +669,9 @@ export default function App() {
                 onStartDungeon={handleStartDungeon}
                 loopCount={loopCount}
                 recordCount={recordCount}
+                initialTab={phoneActiveTab}
                 onClose={() => setPhoneOpen(false)}
+                playerName={playerName}
               />
               {/* Decorative Home Indicator phone button notch bar */}
               <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 w-28 h-1 bg-zinc-800 rounded-full z-50"></div>
@@ -733,6 +741,16 @@ export default function App() {
         {/* SETTINGS MODAL OVERLAY */}
         <AnimatePresence>
           {settingsOpen && (
+            <SettingsModal
+              onClose={() => setSettingsOpen(false)}
+              onSave={saveGameStateReal}
+              onReset={resetGameState}
+              setGold={setGold}
+              setStats={setStats}
+              setLobbyFeedback={setLobbyFeedback}
+            />
+          )}
+          {false && settingsOpen && (
             <div className="fixed inset-0 bg-zinc-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
               <motion.div 
                 initial={{ scale: 0.95, opacity: 0 }}
@@ -853,6 +871,9 @@ export default function App() {
               setNpcs={setNpcs}
               onAdvancePhase={handleAdvancePhase}
               onCollectRecord={handleCollectRecord}
+              recordCount={recordCount}
+              playerName={playerName}
+              dDay={dDay}
             />
           )}
         </div>
@@ -862,23 +883,29 @@ export default function App() {
           
           {/* SmartPhone App trigger */}
           <button
-            onClick={() => setPhoneOpen(true)}
+            onClick={() => {
+              setPhoneActiveTab('status');
+              setPhoneOpen(true);
+            }}
             className="flex items-center justify-center p-3 relative bg-zinc-955 hover:bg-zinc-855 hover:border-blue-500/50 border border-zinc-800 rounded-2xl w-14 h-14 shadow-md transition-all cursor-pointer group"
           >
             <Smartphone className="w-6 h-6 text-blue-400 group-hover:scale-110 transition-transform" />
             
-            {/* Notification badge alert */}
-            <span className="absolute -top-1 -right-1 flex h-4 w-4 shrink-0">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-4 w-4 bg-blue-500 text-[9px] font-bold text-center items-center justify-center text-white font-mono shadow-[0_0_4px_rgba(59,130,246,0.8)]">
-                !
+            {/* Dynamic Notification badge alert */}
+            {hasPendingChats && (
+              <span className="absolute -top-1 -right-1 flex h-4 w-4 shrink-0">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-4 w-4 bg-rose-500 text-[10px] font-bold text-center items-center justify-center text-white font-mono shadow-[0_0_6px_rgba(244,63,94,0.85)]">
+                  N
+                </span>
               </span>
-            </span>
+            )}
           </button>
 
           {/* S-Class Recruit Status Check Trigger */}
           <button
             onClick={() => {
+              setPhoneActiveTab('npc');
               setPhoneOpen(true);
             }}
             className="flex items-center justify-center p-3 bg-zinc-950 hover:bg-zinc-855 hover:border-rose-500/50 border border-zinc-800 rounded-2xl w-14 h-14 shadow-md transition-all cursor-pointer group animate-pulse-slow"
@@ -889,6 +916,7 @@ export default function App() {
           {/* Stat check widget trigger */}
           <button
             onClick={() => {
+              setPhoneActiveTab('records');
               setPhoneOpen(true);
             }}
             className="flex items-center justify-center p-3 bg-zinc-950 hover:bg-zinc-855 hover:border-amber-500/50 border border-zinc-800 rounded-2xl w-14 h-14 shadow-md transition-all cursor-pointer group"

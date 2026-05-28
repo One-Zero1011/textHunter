@@ -129,3 +129,4 @@ export interface ChatHistory {
   [npcId: string]: ChatMessage[];
 }
 
+
