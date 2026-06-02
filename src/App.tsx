@@ -8,8 +8,8 @@ import {
   Dungeon, Equipment, Npc, BodyPartsHP, ChatHistory, CharacterStats 
 } from './types';
 import { 
-  INITIAL_NPCS, INITIAL_EQUIPMENT, DUNGEONS, ACHIEVEMENTS, 
-  INITIAL_CHAT_HISTORY, FAIL_LOGS, generateRandomDungeonsList
+  INITIAL_NPCS, INITIAL_EQUIPMENT, isShopItem, DUNGEONS, ACHIEVEMENTS, 
+  INITIAL_CHAT_HISTORY, FAIL_LOGS, generateRandomDungeonsList, TITLES, SKILLS
 } from './data';
 import DungeonPlay from './components/DungeonPlay';
 import PhoneModal, { TabType } from './components/PhoneModal';
@@ -35,7 +35,7 @@ export default function App() {
   const [gameStarted, setGameStarted] = useState<boolean>(false);
   const [introActive, setIntroActive] = useState<boolean>(false);
   const [loopCount, setLoopCount] = useState<number>(1);
-  const [dDay, setDDay] = useState<number>(100); // 100 days to grow and defeat
+  const [dDay, setDDay] = useState<number>(60); // 60 days to grow and defeat
   const [phaseIndex, setPhaseIndex] = useState<number>(0); // 0: 아침, 1: 점심, 2: 저녁
   const phases = ['아침', '점심', '저녁'];
 
@@ -48,9 +48,11 @@ export default function App() {
   const [stats, setStats] = useState<CharacterStats>({
     strength: 6,
     agility: 6,
-    mana: 6,
+    health: 6,
     intellect: 6
   });
+
+  const [acquiredSkills, setAcquiredSkills] = useState<string[]>([]);
 
   // Body Parts HP (Head, Torso are instant death if 0)
   const [bodyPartsHP, setBodyPartsHP] = useState<BodyPartsHP>({
@@ -74,7 +76,35 @@ export default function App() {
   const [phoneOpen, setPhoneOpen] = useState<boolean>(false);
   const [phoneActiveTab, setPhoneActiveTab] = useState<TabType>('status');
   const [settingsOpen, setSettingsOpen] = useState<boolean>(false);
+  const [equippedTitleId, setEquippedTitleId] = useState<string | null>(null);
   const [endingType, setEndingType] = useState<'dead' | 'world_destroyed' | 'normal' | 'happy' | null>(null);
+
+  // Calculate dynamic effective stats by adding active equipped title rewards and equipped armor/weapons on the fly
+  const getEffectiveStats = (): CharacterStats => {
+    const base = { ...stats };
+    
+    // 1. Add equipment bonuses
+    const equippedItems = inventory.filter(item => item.equipped);
+    equippedItems.forEach(item => {
+      if (item.bonuses.strength) base.strength += item.bonuses.strength;
+      if (item.bonuses.agility) base.agility += item.bonuses.agility;
+      if (item.bonuses.health) base.health += item.bonuses.health;
+      if (item.bonuses.intellect) base.intellect += item.bonuses.intellect;
+    });
+
+    // 2. Add title bonuses
+    if (equippedTitleId) {
+      const activeTitle = TITLES.find(t => t.id === equippedTitleId);
+      if (activeTitle) {
+        if (activeTitle.bonuses.strength) base.strength += activeTitle.bonuses.strength;
+        if (activeTitle.bonuses.agility) base.agility += activeTitle.bonuses.agility;
+        if (activeTitle.bonuses.health) base.health += activeTitle.bonuses.health;
+        if (activeTitle.bonuses.intellect) base.intellect += activeTitle.bonuses.intellect;
+      }
+    }
+    
+    return base;
+  };
 
   // Loop inheritance bonuses when player rewinds/dies
   const [inheritedLevelMultiplier, setInheritedLevelMultiplier] = useState<number>(0);
@@ -106,6 +136,7 @@ export default function App() {
         gold,
         fatigue: override && override.hasOwnProperty('fatigue') ? override.fatigue : fatigue,
         stats,
+        acquiredSkills,
         bodyPartsHP,
         npcs,
         inventory,
@@ -114,6 +145,7 @@ export default function App() {
         availableDungeons,
         inheritedLevelMultiplier,
         lobbyFeedback,
+        equippedTitleId,
       };
       localStorage.setItem('hunter_f_save_state', JSON.stringify(stateToSave));
       setHasSave(true);
@@ -134,6 +166,7 @@ export default function App() {
       if (data.gold !== undefined) setGold(data.gold);
       if (data.fatigue !== undefined) setFatigue(data.fatigue);
       if (data.stats !== undefined) setStats(data.stats);
+      if (data.acquiredSkills !== undefined) setAcquiredSkills(data.acquiredSkills);
       if (data.bodyPartsHP !== undefined) setBodyPartsHP(data.bodyPartsHP);
       if (data.npcs !== undefined) setNpcs(data.npcs);
       if (data.inventory !== undefined) setInventory(data.inventory);
@@ -142,6 +175,7 @@ export default function App() {
       if (data.availableDungeons !== undefined) setAvailableDungeons(data.availableDungeons);
       if (data.inheritedLevelMultiplier !== undefined) setInheritedLevelMultiplier(data.inheritedLevelMultiplier);
       if (data.lobbyFeedback !== undefined) setLobbyFeedback(data.lobbyFeedback);
+      if (data.equippedTitleId !== undefined) setEquippedTitleId(data.equippedTitleId);
       
       setGameStarted(true);
       setIntroActive(false);
@@ -162,16 +196,17 @@ export default function App() {
     setGameStarted(false);
     setIntroActive(false);
     setLoopCount(1);
-    setDDay(100);
+    setDDay(60);
     setPhaseIndex(0);
     setGold(20000);
     setFatigue(100);
     setStats({
       strength: 6,
       agility: 6,
-      mana: 6,
+      health: 6,
       intellect: 6
     });
+    setAcquiredSkills([]);
     setBodyPartsHP({
       head: 100,
       torso: 100,
@@ -189,7 +224,17 @@ export default function App() {
     setSettingsOpen(false);
     setHasSave(false);
     setOnLauncher(true);
+    setEquippedTitleId(null);
     setLobbyFeedback('♻️ 시뮬레이터가 완치된 초기 각인 상태로 역행 설정되었습니다.');
+  };
+
+  const handleExitToLauncherSaved = () => {
+    saveGameStateReal();
+    setSettingsOpen(false);
+    setGameStarted(false);
+    setOnLauncher(true);
+    setHasSave(true);
+    setLobbyFeedback('🚪 진행 상황이 안전하게 저장되었으며 시나리오 선택 화면으로 이동했습니다.');
   };
 
   // Check save on mount
@@ -205,10 +250,10 @@ export default function App() {
     if (gameStarted && fatigue <= 0) {
       const nextDValue = Math.max(0, dDay - 1);
       setDDay(nextDValue);
-      setPhaseIndex(0);
-      setFatigue(50); // refills to 50 fatigue
+      // Wake up at the same hour on the next day and recover 30 fatigue
+      setFatigue(30); 
       
-      setLobbyFeedback('💤 극도의 신체 피색력 한계로 실신 수면에 빠졌습니다. 영양 주사로 회복 후 아침에 눈을 뜨며 피로도 50이 회복되었습니다.');
+      setLobbyFeedback('💤 극도의 신체 피색력 한계로 일시 실신 상태에 빠졌습니다. 다음날 같은 시간에 깨어나며 피로도가 30 회복되었습니다.');
 
       // Refresh dungeons/daysLeft
       setAvailableDungeons(prevDungeons => {
@@ -216,8 +261,8 @@ export default function App() {
           .map(d => ({ ...d, daysLeft: d.daysLeft ? d.daysLeft - 1 : 0 }))
           .filter(d => d.daysLeft !== undefined && d.daysLeft > 0);
 
-        const elapsedDays = 100 - nextDValue;
-        const maxSlots = Math.min(8, 3 + Math.floor(elapsedDays / 12));
+        const elapsedDays = 60 - nextDValue;
+        const maxSlots = Math.min(8, 3 + Math.floor(elapsedDays / 7));
 
         if (updatedList.length < maxSlots) {
           const needed = maxSlots - updatedList.length;
@@ -234,12 +279,12 @@ export default function App() {
       setTimeout(() => {
         saveGameStateReal({
           dDay: nextDValue,
-          phaseIndex: 0,
-          fatigue: 50
+          phaseIndex: phaseIndex,
+          fatigue: 30
         });
       }, 100);
     }
-  }, [fatigue, gameStarted]);
+  }, [fatigue, gameStarted, phaseIndex, dDay]);
 
   // Trigger S-Class Rift gate final confrontation on D-0 automatically
   useEffect(() => {
@@ -308,10 +353,10 @@ export default function App() {
           .filter(d => d.daysLeft !== undefined && d.daysLeft > 0);
       }
 
-      // Calculate capacity based on days elapsed (100 - expectedDDay)
+      // Calculate capacity based on days elapsed (60 - expectedDDay)
       const prospectiveDDayVal = (phaseIndex === 2) ? Math.max(0, dDay - 1) : dDay;
-      const elapsedDays = 100 - prospectiveDDayVal;
-      const maxSlots = Math.min(8, 3 + Math.floor(elapsedDays / 12));
+      const elapsedDays = 60 - prospectiveDDayVal;
+      const maxSlots = Math.min(8, 3 + Math.floor(elapsedDays / 7));
 
       // 3. Fill missing slots if current count is less than maxSlots
       if (updatedList.length < maxSlots) {
@@ -338,7 +383,8 @@ export default function App() {
     }
 
     // Check Adequacy of requirements
-    const totalCP = (stats.strength * 12) + (stats.agility * 8) + (stats.mana * 10) + (stats.intellect * 5);
+    const effStats = getEffectiveStats();
+    const totalCP = effStats.strength + effStats.agility + effStats.health + effStats.intellect;
     
     // Check Higher class entry penalty or warning
     if (totalCP < dungeon.recommendedPower && dungeon.id !== 'gate_s') {
@@ -363,7 +409,27 @@ export default function App() {
     handleAdvancePhase(clearedId); // Consumes 1 phase and removes from pool if success
 
     if (success) {
-      setLobbyFeedback(`🎉 게이트 정화 정밀 완료! 사소한 유산물 세관 처분으로 자금이 입금되었습니다.`);
+      let dropMsg = '';
+      // High-tier unacquired drop pool
+      const unacquiredLootPool = inventory.filter(item => !item.purchased && !isShopItem(item.id));
+      
+      // Determine drop chance based on dungeon rank
+      const isBoss = activeDungeon?.id === 'gate_s' || (activeDungeon?.gridSize && activeDungeon.gridSize >= 5);
+      const dropChance = isBoss ? 1.0 : 0.60; // 100% for boss/large, 60% for others
+      
+      if (Math.random() < dropChance && unacquiredLootPool.length > 0) {
+        // Select one random item
+        const randomIndex = Math.floor(Math.random() * unacquiredLootPool.length);
+        const chosenLoot = unacquiredLootPool[randomIndex];
+        
+        // Grant to player
+        setInventory(prev => prev.map(item => item.id === chosenLoot.id ? { ...item, purchased: true } : item));
+        
+        const typeKo = chosenLoot.slot === 'skillbook' ? '전설의 비급서 스킬북' : 'S/A/B급 고유 유물 장비';
+        dropMsg = `\n\n🎁 [스페셜 전리품 발견!] 게이트의 탐사 궤적 균열 심층에서 숨겨져 있던 ${typeKo}인 [${chosenLoot.name}]을(를) 발견하여 전리품 가방에 취합 하였습니다! (인벤토리에 즉각 추가됨)`;
+      }
+
+      setLobbyFeedback(`🎉 게이트 정화 정밀 완료! 사소한 유산물 세관 처분으로 자금이 입금되었습니다.${dropMsg}`);
       
       // If S class boss cleared
       if (activeDungeon?.id === 'gate_s') {
@@ -387,7 +453,7 @@ export default function App() {
   // Rewind loop trigger
   const handleRewindLoop = () => {
     setLoopCount(prev => prev + 1);
-    setDDay(100);
+    setDDay(60);
     setPhaseIndex(0);
     setGold(20000 + (loopCount * 3000)); // slightly more starting gold in higher loops
     setFatigue(100);
@@ -396,7 +462,7 @@ export default function App() {
     setStats({
       strength: 6 + (loopCount * 3),
       agility: 6 + (loopCount * 3),
-      mana: 6 + (loopCount * 2),
+      health: 6 + (loopCount * 2),
       intellect: 6 + (loopCount * 2)
     });
 
@@ -415,7 +481,8 @@ export default function App() {
       ...n,
       rapport: Math.min(100, Math.floor(n.rapport * 0.3) + 12),
       isAlly: false,
-      unlocked: false // start as complete strangers in every loop
+      unlocked: false, // start as complete strangers in every loop
+      hasWitnessedSpecial: false
     })));
 
     setChatHistory(INITIAL_CHAT_HISTORY);
@@ -423,14 +490,34 @@ export default function App() {
     setEndingType(null);
     setIntroActive(true); // show intro cinematic reflecting loop count
     setLobbyFeedback(`⏳ 끈질긴 영혼의 외침 속에 시간이 되감겼습니다... 억겁 #${loopCount+1}경로 돌입.`);
-    setAvailableDungeons(generateRandomDungeonsList(3, 100));
+    setAvailableDungeons(generateRandomDungeonsList(3, 60));
   };
 
   const handleCollectRecord = () => {
     setRecordCount(prev => Math.min(FAIL_LOGS.length, prev + 1));
   };
 
-  const totalCP = (stats.strength * 12) + (stats.agility * 8) + (stats.mana * 10) + (stats.intellect * 5);
+  const handleLearnSkill = (skillId: string, bookId: string) => {
+    if (!acquiredSkills.includes(skillId)) {
+      setAcquiredSkills(prev => [...prev, skillId]);
+    }
+    
+    setInventory(prev => prev.map(item => {
+      if (item.id === bookId) {
+        return { ...item, purchased: false, equipped: false };
+      }
+      return item;
+    }));
+
+    setLobbyFeedback(`📖 비급서 해독 완료! 신규 스킬 [${SKILLS.find(s => s.id === skillId)?.name || '기예'}]을 영혼 인자에 완전히 새겼습니다!`);
+    
+    setTimeout(() => {
+      saveGameStateReal();
+    }, 100);
+  };
+
+  const effStatsForCP = getEffectiveStats();
+  const totalCP = effStatsForCP.strength + effStatsForCP.agility + effStatsForCP.health + effStatsForCP.intellect;
 
   return (
     <div className="w-full h-screen h-[100dvh] bg-zinc-950 text-zinc-100 flex flex-col items-center justify-center p-0 md:p-6 overflow-hidden select-none font-sans relative">
@@ -454,6 +541,8 @@ export default function App() {
             loopCount={loopCount}
             recordCount={recordCount}
             logoImg={logoImg}
+            hasSave={hasSave}
+            onContinueGame={loadGameState}
             onSelectMainGame={() => {
               setGameStarted(true);
               setIntroActive(true);
@@ -490,7 +579,7 @@ export default function App() {
         {gameStarted && !introActive && activeDungeon && (
           <DungeonPlay
             dungeon={activeDungeon}
-            stats={stats}
+            stats={getEffectiveStats()}
             bodyPartsHP={bodyPartsHP}
             setBodyPartsHP={setBodyPartsHP}
             gold={gold}
@@ -499,6 +588,7 @@ export default function App() {
             setFatigue={setFatigue}
             allies={npcs}
             inventory={inventory}
+            acquiredSkills={acquiredSkills}
             onFinishDungeon={handleFinishDungeon}
             onDie={handleDie}
             onCollectRecord={handleCollectRecord}
@@ -512,6 +602,8 @@ export default function App() {
             endingType={endingType}
             loopCount={loopCount}
             recordCount={recordCount}
+            stats={stats}
+            dDay={dDay}
             handleRewindLoop={handleRewindLoop}
             resetGameState={resetGameState}
             setGameStarted={setGameStarted}
@@ -654,7 +746,7 @@ export default function App() {
               </div>
               
               <PhoneModal
-                stats={stats}
+                stats={getEffectiveStats()}
                 bodyPartsHP={bodyPartsHP}
                 setBodyPartsHP={setBodyPartsHP}
                 gold={gold}
@@ -665,6 +757,8 @@ export default function App() {
                 setChatHistory={setChatHistory}
                 inventory={inventory}
                 setInventory={setInventory}
+                acquiredSkills={acquiredSkills}
+                onLearnSkill={handleLearnSkill}
                 dungeons={availableDungeons}
                 onStartDungeon={handleStartDungeon}
                 loopCount={loopCount}
@@ -672,6 +766,11 @@ export default function App() {
                 initialTab={phoneActiveTab}
                 onClose={() => setPhoneOpen(false)}
                 playerName={playerName}
+                equippedTitleId={equippedTitleId}
+                onEquipTitle={(titleId) => {
+                  setEquippedTitleId(titleId);
+                  saveGameStateReal();
+                }}
               />
               {/* Decorative Home Indicator phone button notch bar */}
               <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 w-28 h-1 bg-zinc-800 rounded-full z-50"></div>
@@ -745,6 +844,7 @@ export default function App() {
               onClose={() => setSettingsOpen(false)}
               onSave={saveGameStateReal}
               onReset={resetGameState}
+              onExitToLauncher={handleExitToLauncherSaved}
               setGold={setGold}
               setStats={setStats}
               setLobbyFeedback={setLobbyFeedback}
@@ -824,7 +924,7 @@ export default function App() {
                         setStats(s => ({
                           strength: s.strength + 5,
                           agility: s.agility + 5,
-                          mana: s.mana + 5,
+                          health: s.health + 5,
                           intellect: s.intellect + 5,
                         }));
                         setLobbyFeedback('🛠️ [디버그]: 차원 보정 보너스로 실효 전 스탯이 +5 증가했습니다.');
@@ -874,6 +974,8 @@ export default function App() {
               recordCount={recordCount}
               playerName={playerName}
               dDay={dDay}
+              inventory={inventory}
+              setInventory={setInventory}
             />
           )}
         </div>
@@ -888,6 +990,7 @@ export default function App() {
               setPhoneOpen(true);
             }}
             className="flex items-center justify-center p-3 relative bg-zinc-955 hover:bg-zinc-855 hover:border-blue-500/50 border border-zinc-800 rounded-2xl w-14 h-14 shadow-md transition-all cursor-pointer group"
+            title="스마트폰"
           >
             <Smartphone className="w-6 h-6 text-blue-400 group-hover:scale-110 transition-transform" />
             
@@ -900,6 +1003,18 @@ export default function App() {
                 </span>
               </span>
             )}
+          </button>
+
+          {/* 인벤토리 가방 버튼 (Inventory Button next to the Smartphone) */}
+          <button
+            onClick={() => {
+              setPhoneActiveTab('inventory');
+              setPhoneOpen(true);
+            }}
+            className="flex items-center justify-center p-3 relative bg-zinc-950 hover:bg-zinc-855 hover:border-violet-500/50 border border-zinc-800 rounded-2xl w-14 h-14 shadow-md transition-all cursor-pointer group"
+            title="인벤토리"
+          >
+            <FolderOpen className="w-6 h-6 text-violet-400 group-hover:scale-110 transition-transform" />
           </button>
 
           {/* S-Class Recruit Status Check Trigger */}

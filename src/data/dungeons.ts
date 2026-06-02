@@ -222,13 +222,13 @@ export function generateRandomDungeon(rank: string, id: string): Dungeon {
   };
 }
 
-export function generateRandomDungeonsList(count: number, dDay: number = 100): Dungeon[] {
+export function generateRandomDungeonsList(count: number, dDay: number = 60): Dungeon[] {
   const list: Dungeon[] = [];
   const ranks = ['F급', 'E급', 'D급', 'C급', 'B급', 'A급', 'S급'];
   
-  // Calculate urgency based on 100 - dDay (ranges from 0 to 100)
-  const urgency = Math.max(0, Math.min(100, 100 - dDay));
-  const ratio = urgency / 100; // 0.0 to 1.0
+  // Calculate urgency based on 60 - dDay (ranges from 0 to 60)
+  const urgency = Math.max(0, Math.min(60, 60 - dDay));
+  const ratio = urgency / 60; // 0.0 to 1.0
 
   // As d-day approaches 0, higher rank dungeons spawn much more frequently
   const baseWeights = [0.40, 0.25, 0.15, 0.10, 0.06, 0.03, 0.01];

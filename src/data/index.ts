@@ -1,5 +1,5 @@
 export { INITIAL_NPCS, INITIAL_CHAT_HISTORY } from './npcs';
-export { INITIAL_EQUIPMENT } from './equipment';
+export { INITIAL_EQUIPMENT, isShopItem } from './equipment';
 export { DUNGEONS, generateRandomDungeonsList } from './dungeons';
 export { ACHIEVEMENTS } from './achievements';
 export { FAIL_LOGS } from './records';
@@ -8,3 +8,7 @@ export { TRAINING_ACTIVITIES, RECOVERY_ACTIVITIES, JOB_ACTIVITIES } from './loca
 export type { TrainingActivity, RecoveryActivity, JobActivity } from './locations';
 export { NPC_EVENTS } from './npcEvents';
 export type { NpcEvent, NpcChoice } from './npcEvents';
+export { TITLES } from './titles';
+export type { Title } from './titles';
+export { SKILLS, SKILL_BOOK_MAPPING } from './skills';
+export type { Skill } from './skills';

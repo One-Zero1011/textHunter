@@ -33,14 +33,14 @@ export const TRAINING_ACTIVITIES: TrainingActivity[] = [
     message: '🏃 육상 스피돔 트랙 왕복 전속 질주를 달성했습니다. 하체 순발력과 반사 수치가 발달해 민첩 스탯이 +4 상승했습니다! (+15 피로도)'
   },
   {
-    id: 'train_mana',
-    name: '🔥 기온 마정 호흡 조율 (마력 증가)',
-    description: 'costs 15 Fatigue. increases Mana potential',
-    rewardPreview: '+4 MAN',
+    id: 'train_health',
+    name: '💖 심폐 기력 체강 강화 (체력 증가)',
+    description: 'costs 15 Fatigue. increases Health and HP endurance',
+    rewardPreview: '+4 HP',
     fatigueCost: 15,
     maxFatigueLimit: 85,
-    statBonus: { mana: 4 },
-    message: '🔥 가상의 마석 유도 단상에서 선을 가해 호흡 제어를 시도했습니다. 심장 속 마정석이 융화되며 마력 스탯이 +4 상승했습니다! (+15 피로도)'
+    statBonus: { health: 4 },
+    message: '💖 특수 각성 촉진 심폐 고강도 러닝 런지를 수행했습니다. 기력 혈맥이 탄탄히 조율되며 체력 스탯이 +4 상승했습니다! (+15 피로도)'
   },
   {
     id: 'train_intellect',

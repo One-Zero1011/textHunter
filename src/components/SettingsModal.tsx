@@ -11,6 +11,7 @@ interface SettingsModalProps {
   onClose: () => void;
   onSave: () => void;
   onReset: () => void;
+  onExitToLauncher: () => void;
   setGold: React.Dispatch<React.SetStateAction<number>>;
   setStats: React.Dispatch<React.SetStateAction<CharacterStats>>;
   setLobbyFeedback: (msg: string) => void;
@@ -20,6 +21,7 @@ export default function SettingsModal({
   onClose,
   onSave,
   onReset,
+  onExitToLauncher,
   setGold,
   setStats,
   setLobbyFeedback
@@ -60,6 +62,13 @@ export default function SettingsModal({
             className="w-full py-3.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl active:scale-95 transition-all text-xs tracking-widest uppercase cursor-pointer flex items-center justify-center gap-2 font-mono"
           >
             <span>💾 진행 상황 영구 보존 (저장)</span>
+          </button>
+
+          <button
+            onClick={onExitToLauncher}
+            className="w-full py-3.5 bg-gradient-to-r from-teal-700 to-emerald-700 hover:from-teal-600 hover:to-emerald-600 text-white font-bold rounded-xl active:scale-95 transition-all text-xs  tracking-widest uppercase cursor-pointer flex items-center justify-center gap-2 font-mono"
+          >
+            <span>🚪 저장 후 시나리오 화면으로 나가기</span>
           </button>
 
           <button

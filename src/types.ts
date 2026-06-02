@@ -6,14 +6,14 @@
 export interface StatBonuses {
   strength?: number;
   agility?: number;
-  mana?: number;
+  health?: number;
   intellect?: number;
 }
 
 export interface CharacterStats {
   strength: number;    // 근력
   agility: number;     // 민첩
-  mana: number;        // 마력
+  health: number;      // 체력
   intellect: number;   // 지력
 }
 
@@ -28,12 +28,14 @@ export interface BodyPartsHP {
 
 export type BodyPartName = keyof BodyPartsHP;
 
+export type EquipmentSlot = 'head' | 'torso' | 'arms' | 'legs' | 'weapon' | 'ring' | 'necklace' | 'skillbook';
+
 export interface Equipment {
   id: string;
   name: string;
   description: string;
   price: number;
-  slot: 'weapon' | 'armor' | 'accessory' | 'shield';
+  slot: EquipmentSlot;
   bonuses: StatBonuses;
   hpModifier?: Partial<BodyPartsHP>;
   purchased: boolean;
@@ -59,6 +61,7 @@ export interface Npc {
   dislikes: string[];
   fear: string;
   features: string[];
+  hasWitnessedSpecial?: boolean; // 특별 한정 조우 스토리 완료 여부
 }
 
 export interface DialogueNode {

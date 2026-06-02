@@ -5,17 +5,18 @@
 
 import React, { useState, useEffect } from 'react';
 import { Npc, Equipment, Dungeon, BodyPartsHP, GridRoom, CombatLog } from '../types';
+import { SKILLS } from '../data';
 import { 
   Compass, Shield, AlertTriangle, Play, HelpCircle, Trophy, Sparkles,
   Sword, ShieldAlert, Heart, Activity, ArrowRight, ArrowLeft, ArrowUp, ArrowDown,
-  Gift, Skull, CheckCircle2, RefreshCw, Smartphone
+  Gift, Skull, CheckCircle2, RefreshCw, Smartphone, BookOpen
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { generateNonLinearDungeonMap } from '../data/dungeonGenerator';
 
 interface DungeonPlayProps {
   dungeon: Dungeon;
-  stats: { strength: number; agility: number; mana: number; intellect: number };
+  stats: { strength: number; agility: number; health: number; intellect: number };
   bodyPartsHP: BodyPartsHP;
   setBodyPartsHP: React.Dispatch<React.SetStateAction<BodyPartsHP>>;
   gold: number;
@@ -24,6 +25,7 @@ interface DungeonPlayProps {
   setFatigue: React.Dispatch<React.SetStateAction<number>>;
   allies: Npc[];
   inventory: Equipment[];
+  acquiredSkills?: string[];
   onFinishDungeon: (success: boolean, loot: string[], logText: string) => void;
   onDie: () => void;
   onCollectRecord: () => void;
@@ -41,6 +43,7 @@ export default function DungeonPlay({
   setFatigue,
   allies,
   inventory,
+  acquiredSkills = [],
   onFinishDungeon,
   onDie,
   onCollectRecord,
@@ -65,6 +68,7 @@ export default function DungeonPlay({
   const [currentTurnIdx, setCurrentTurnIdx] = useState<number>(0);
   const [isRolling, setIsRolling] = useState<boolean>(false);
   const [rolledValue, setRolledValue] = useState<number>(0);
+  const [showSkillsMenu, setShowSkillsMenu] = useState<boolean>(false);
 
   // Co-fighters
   const [activeAllies, setActiveAllies] = useState<Npc[]>([]);
@@ -151,12 +155,12 @@ export default function DungeonPlay({
         // Random Event
         const eventId = Math.floor(Math.random() * 3);
         if (eventId === 0) {
-          logs.push(`💡 지독한 마나 웅덩이를 발견했습니다. 주변 마력이 당신의 근원과 상호작용합니다.`);
-          // Damage left arm, but increase Intellect/Mana
+          logs.push(`💡 생명력이 약동하는 고인 체력 영양천을 발견했습니다. 강력한 인체 복구 요소가 몸에 녹아듭니다.`);
+          // Damage left arm, but increase Intellect/health
           setBodyPartsHP(prev => ({ ...prev, leftArm: Math.max(10, prev.leftArm - 15) }));
-          stats.mana += 2;
+          stats.health += 2;
           stats.intellect += 1;
-          logs.push(`[영구 스탯 향상] 마력 +2, 지력 +1 / [왼팔 부상] HP -15`);
+          logs.push(`[영구 스탯 향상] 체력 +2, 지력 +1 / [왼팔 부상] HP -15`);
         } else if (eventId === 1) {
           logs.push(`🌿 보증된 치유의 수풀을 발견했습니다. 전신이 서서히 회복됩니다.`);
           setBodyPartsHP(prev => ({
@@ -191,29 +195,84 @@ export default function DungeonPlay({
     setInBattle(true);
     setTurn(1);
     
-    // Choose Enemy type based on Dungeon rank
-    let name = '그림자 파수꾼늑대';
+    // Ranks mapping for safe progression
+    const rankList = ['F급', 'E급', 'D급', 'C급', 'B급', 'A급', 'S급'];
+    const currentRankIdx = rankList.indexOf(dungeon.rank) !== -1 ? rankList.indexOf(dungeon.rank) : 0;
+    
+    // Choose actual monster/boss rank (most likely dungeon rank, occasionally weaker, never stronger)
+    let chosenRank = dungeon.rank;
+    if (currentRankIdx > 0) {
+      const roll = Math.random();
+      if (roll < 0.20) {
+        // 20% chance to summon a monster 1-2 ranks lower
+        const drop = Math.random() < 0.5 ? 1 : 2;
+        const targetIdx = Math.max(0, currentRankIdx - drop);
+        chosenRank = rankList[targetIdx];
+      }
+    }
+
+    let name = 'F급 그림자 파수꾼늑대';
     let hp = 120;
     let attack = 15;
 
     if (boss) {
-      name = `S급 [시공의 거울 오버시어: 아바타]`;
-      hp = 300 + (stats.strength * 2);
-      attack = 30;
-    } else {
-      switch (dungeon.rank) {
+      // Boss selection by chosen rank (weaker boss if chosenRank rolled lower)
+      switch (chosenRank) {
         case 'F급':
-          name = '미각성 도살자 슬라임'; hp = 60; attack = 8; break;
+          name = 'F급 [정화되지 않은 늪지 도살자]';
+          hp = 120 + stats.strength;
+          attack = 12;
+          break;
         case 'E급':
-          name = '귀갑 장갑 고블린'; hp = 90; attack = 12; break;
+          name = 'E급 [지하 둥지의 군장 워로블]';
+          hp = 160 + Math.floor(stats.strength * 1.2);
+          attack = 16;
+          break;
         case 'D급':
-          name = '그림자 워그 장군'; hp = 130; attack = 18; break;
+          name = 'D급 [차원 파편의 그림자 리퍼]';
+          hp = 215 + Math.floor(stats.strength * 1.4);
+          attack = 20;
+          break;
         case 'C급':
-          name = '피에 굶주린 네크로 로드'; hp = 180; attack = 24; break;
+          name = 'C급 [성좌의 정찰 집행기]';
+          hp = 270 + Math.floor(stats.strength * 1.6);
+          attack = 24;
+          break;
         case 'B급':
-          name = '균열의 독니 키메라'; hp = 220; attack = 28; break;
+          name = 'B급 [키메라 블러드 베히모스]';
+          hp = 330 + Math.floor(stats.strength * 1.8);
+          attack = 28;
+          break;
         case 'A급':
-          name = '불사 군단의 타락한 대검투사'; hp = 265; attack = 35; break;
+          name = 'A급 [성좌 봉인 해제의 불사 투사]';
+          hp = 405 + Math.floor(stats.strength * 2.0);
+          attack = 35;
+          break;
+        case 'S급':
+        default:
+          name = 'S급 [시공의 거울 오버시어: 아바타]';
+          hp = 480 + Math.floor(stats.strength * 2.2);
+          attack = 42;
+          break;
+      }
+    } else {
+      // Regular monster selection by chosen rank (never higher than dungeon rank)
+      switch (chosenRank) {
+        case 'F급':
+          name = 'F급 미각성 도살자 슬라임'; hp = 60; attack = 8; break;
+        case 'E급':
+          name = 'E급 귀갑 장갑 고블린'; hp = 90; attack = 12; break;
+        case 'D급':
+          name = 'D급 그림자 워그 장군'; hp = 130; attack = 18; break;
+        case 'C급':
+          name = 'C급 피에 굶주린 네크로 로드'; hp = 180; attack = 24; break;
+        case 'B급':
+          name = 'B급 균열의 독니 키메라'; hp = 220; attack = 28; break;
+        case 'A급':
+          name = 'A급 불사 군단의 타락한 대검투사'; hp = 265; attack = 35; break;
+        case 'S급':
+        default:
+          name = 'S급 시공 왜곡 마수 오르토스'; hp = 330; attack = 42; break;
       }
     }
 
@@ -262,6 +321,95 @@ export default function DungeonPlay({
     setCombatLogs(prev => [...prev, { id: Math.random().toString(), text, type }]);
   };
 
+  const castActiveSkill = (skillId: string) => {
+    if (currentTurnEntity !== 'player' || isRolling) return;
+    setIsRolling(true);
+    setShowSkillsMenu(false);
+    
+    setTimeout(() => {
+      let damage = 0;
+      let logMsg = '';
+      let logType: CombatLog['type'] = 'skill';
+      
+      switch (skillId) {
+        // --- Summon 계열 ---
+        case 'skill_summon_shadow':
+          damage = 50 + Math.floor(stats.intellect * 1.5);
+          logMsg = `🔮 [그림자 소환] 그림자 군단을 어둠 속에서 하차시켰습니다! 군단병들의 파상 공세로 적에게 ${damage}의 기동 타격을 입혔습니다!`;
+          break;
+        case 'skill_summon_golem':
+          damage = 25 + Math.floor(stats.strength * 1.0);
+          setShieldActive(true); 
+          logMsg = `🔮 [골렘 기동] 대지 장벽을 머무금은 강철 골렘을 소환했습니다. 적에게 ${damage}의 물리 공격을 가하며, 다음 턴의 위기를 가로막을 보호막을 활성화했습니다!`;
+          break;
+        case 'skill_summon_dragon':
+          damage = 100 + Math.floor(stats.intellect * 2.5);
+          logMsg = `🔮 [화룡 소환] 시공간 너머의 전설적 화룡을 연성 소환했습니다! 극염 브레스 폭사로 적에게 큰 ${damage}의 화염 폭발 무색 데미지를 입혔습니다!`;
+          break;
+          
+        // --- Magic 계열 ---
+        case 'skill_magic_fire':
+          damage = 60 + Math.floor(stats.intellect * 2.0);
+          logMsg = `🔥 [화염 작렬] 마력 연쇄 격발을 통한 불꽃 탄환을 발사했습니다! 적의 장벽을 녹이며 ${damage}의 마법 데미지를 입혔습니다.`;
+          break;
+        case 'skill_magic_thunder':
+          damage = 45 + Math.floor(stats.intellect * 1.3);
+          logMsg = `⚡ [뇌신 폭뢰] 초강 고압 전격 오라의 낙뢰를 적의 뇌리에 폭화했습니다! 적에게 ${damage}의 감전 데미지를 입혔습니다.`;
+          break;
+        case 'skill_magic_restoration':
+          setBodyPartsHP(prev => {
+            const copy = { ...prev };
+            (Object.keys(copy) as Array<keyof BodyPartsHP>).forEach(part => {
+              copy[part] = Math.min(100, copy[part] + 35);
+            });
+            return copy;
+          });
+          logMsg = `✨ [오라 치유] 신성한 인과 복원 성광을 전신에 피워올렸습니다! 축복으로 소실되지 않은 전 부위 체력(HP)을 +35 치유했습니다!`;
+          logType = 'heal';
+          break;
+          
+        // --- Hunter 계열 ---
+        case 'skill_hunter_dash':
+          damage = 35 + Math.floor(stats.agility * 1.8);
+          logMsg = `🏃 [차원 회피참] 초고속 궤도를 그리며 사각지대를 강습 통과했습니다! 적에게 ${damage}의 관통 참격 피해를 주었습니다.`;
+          break;
+        case 'skill_hunter_shield':
+          setShieldActive(true);
+          damage = 20 + Math.floor(stats.intellect * 0.8);
+          logMsg = `🛡️ [반작용 장벽] 공간 왜곡형 보호막을 전개했습니다! 다음 치명적 공격으로부터 안전하며 적에게 ${damage}의 마법 데미지를 복사했습니다!`;
+          break;
+        case 'skill_hunter_execution':
+          const isLowHP = battleEnemyHP < (battleEnemyMaxHP * 0.5); 
+          const execBonus = isLowHP ? 2.5 : 1.2;
+          damage = Math.floor((45 + stats.strength * 2.0) * execBonus);
+          logMsg = `🗡 *일점섬 멸살참* 극도의 살기를 응집하여 급소를 전광석화처럼 통과했습니다! 적에게 ${damage}의 깊은 상흔을 주었습니다! ${isLowHP ? '(체력 50% 이하 필살 가중 처벌 극대 데미지!)' : ''}`;
+          break;
+          
+        default:
+          damage = 35;
+          logMsg = `🧪 기예의 잔상을 휘둘러 적에게 ${damage}의 피해를 입혔습니다!`;
+          break;
+      }
+      
+      const nextHp = Math.max(0, battleEnemyHP - damage);
+      setBattleEnemyHP(nextHp);
+      addBattleLog(logMsg, logType);
+      setIsRolling(false);
+      
+      if (nextHp <= 0) {
+        setTimeout(() => {
+          endBattle(true);
+        }, 800);
+      } else {
+        if (skillId === 'skill_magic_thunder' && Math.random() < 0.6) {
+          addBattleLog(`⚡ [일시 감전]: 뇌전 충격의 마비로 인해 적이 다음 턴 행동 불가에 빠졌습니다! (나의 연속 공격 기회)`, 'skill');
+        } else {
+          nextTurn();
+        }
+      }
+    }, 800);
+  };
+
   // Perform combat turns
   const executePlayerAttack = () => {
     if (isRolling) return;
@@ -291,7 +439,7 @@ export default function DungeonPlay({
       const isGeumJoined = activeAllies.some(a => a.id === 'geum');
       if (actualRoll < 12 && isGeumJoined && !geumSkillUsed) {
         setGeumSkillUsed(true);
-        const bonusDmg = Math.floor(stats.mana * 1.2);
+        const bonusDmg = Math.floor(stats.health * 1.2);
         damage += bonusDmg;
         addBattleLog(`⚡ S급 금채란이 비아냥거리며 뒤에서 거드는 [황금색 참교육]! "+${bonusDmg} 폭발 속성 데미지 주입"`, 'skill');
       }
@@ -337,10 +485,38 @@ export default function DungeonPlay({
           addBattleLog(`🛡️ 백운혁의 방패 치기! 적을 넉백시키고 ${dmg}의 데미지를 부여했습니다.`, 'ally');
         }
       } else if (allyId === 'geum') {
-        dmg = 45 + Math.floor(stats.mana * 0.4);
+        dmg = 45 + Math.floor(stats.health * 0.4);
         addBattleLog(`⚡ 금채란이 공중에 수십 발의 황금 마석 탄환을 발포해 ${dmg}의 폭발 데미지를 뿜었습니다!`, 'ally');
       } else if (allyId === 'lim') {
         addBattleLog(`📖 임소연이 가죽 고서의 인과율을 복제하여 파티 공격력을 보정합니다. (모든 주사위 크리티컬 보정)`, 'ally');
+      } else if (allyId === 'kang') {
+        dmg = 40 + Math.floor(stats.agility * 0.3) + Math.floor(stats.health * 0.2);
+        addBattleLog(`🎯 B급 스나이퍼 강다인이 저격 라이플로 적의 심장을 관통하는 사격을 감행해 ${dmg}의 관통 데미지를 입혔습니다!`, 'ally');
+      } else if (allyId === 'yoo') {
+        dmg = 28 + Math.floor(stats.intellect * 0.3);
+        addBattleLog(`🧭 C급 탐측사 유채은이 굴절 유도 마나 공간 파동탄을 쏘아 적의 밸런스를 흩뜨리며 ${dmg}의 정밀 치명 데미지를 가했습니다!`, 'ally');
+      } else if (allyId === 'choi') {
+        dmg = 35 + Math.floor(stats.strength * 0.4);
+        addBattleLog(`🪓 D급 강습 전투원 최강식이 고함을 지르며 거대한 공격 도끼를 휘둘러 ${dmg}의 타격 데미지를 입혔습니다!`, 'ally');
+      } else if (allyId === 'park') {
+        dmg = 12 + Math.floor(stats.intellect * 0.1);
+        setBodyPartsHP(prev => {
+          let lowestPart: keyof BodyPartsHP = 'torso';
+          let lowestVal = prev['torso'];
+          (Object.keys(prev) as Array<keyof BodyPartsHP>).forEach(part => {
+            if (prev[part] < lowestVal) {
+              lowestVal = prev[part];
+              lowestPart = part;
+            }
+          });
+          const updatedVal = Math.min(100, prev[lowestPart] + 20);
+          return { ...prev, [lowestPart]: updatedVal };
+        });
+        addBattleLog(`🧪 E급 보조 의료원 박소록이 [진통 영양제]를 주사했습니다! 가장 치명적인 부위를 보완해 +20 HP를 치유했습니다!`, 'heal');
+        addBattleLog(`🧪 박소록이 날카로운 주사 바늘과 메스로 엄호 사격해 ${dmg}의 데미지를 보충했습니다.`, 'ally');
+      } else if (allyId === 'shin') {
+        dmg = 10 + Math.floor(stats.strength * 0.1);
+        addBattleLog(`📦 F급 신현민이 뒤쪽에서 골동품 수집 고압 마정 수류탄 보따리를 마구 투사해 ${dmg}의 화력 폭발 데미지를 흩뿌렸습니다!`, 'ally');
       }
       
       if (dmg > 0) {
@@ -933,30 +1109,92 @@ export default function DungeonPlay({
                 onClick={executePlayerAttack}
                 className="flex flex-col items-center justify-center aspect-[5/3] bg-gradient-to-b from-rose-600 to-rose-700 hover:from-rose-500 hover:to-rose-600 disabled:from-neutral-800 disabled:to-neutral-900 disabled:border-neutral-700 disabled:text-neutral-500 hover:scale-[1.02] border border-rose-500 rounded-lg font-bold text-neutral-100 shadow transition-all duration-150 py-1"
               >
-                <Sword className="w-4 h-4 mb-1 animate-pulse text-white" />
+                <Sword className="w-4 h-4 mb-2 animate-pulse text-white font-sans shrink-0" />
                 <span className="text-[9px] uppercase font-bold tracking-wider">🗡️ 공격</span>
+              </button>
+
+              {/* Use Active learned skills */}
+              <button
+                disabled={currentTurnEntity !== 'player' || isRolling || acquiredSkills.length === 0}
+                onClick={() => setShowSkillsMenu(!showSkillsMenu)}
+                className={`flex flex-col items-center justify-center aspect-[5/3] border rounded-lg font-bold transition-all duration-150 py-1 relative overflow-hidden shrink-0 ${
+                  acquiredSkills.length === 0
+                    ? 'bg-neutral-950 border-neutral-850 text-neutral-650 cursor-not-allowed'
+                    : showSkillsMenu
+                      ? 'bg-emerald-900 hover:bg-emerald-850 text-emerald-100 border-emerald-400 scale-[1.02]'
+                      : 'bg-emerald-950/80 hover:bg-emerald-900 border-emerald-500 hover:scale-[1.02]'
+                }`}
+              >
+                <BookOpen className={`w-4 h-4 mb-2 shrink-0 ${acquiredSkills.length > 0 ? 'text-emerald-400 animate-bounce' : 'text-neutral-600'}`} />
+                <span className="text-[9px] truncate">🔥 {acquiredSkills.length > 0 ? '스킬 시전' : '스킬 잠금'}</span>
+                {acquiredSkills.length > 0 && (
+                  <span className="absolute top-0 right-0 px-1.5 py-0.5 bg-emerald-500 text-[6.5px] font-black text-white uppercase rounded-bl">
+                    {acquiredSkills.length}
+                  </span>
+                )}
               </button>
 
               {/* Escape retreat */}
               <button
                 disabled={currentTurnEntity !== 'player' || isRolling}
                 onClick={handleRetreat}
-                className="flex flex-col items-center justify-center aspect-[5/3] bg-neutral-800 hover:bg-neutral-750 border border-neutral-700 disabled:border-neutral-800 disabled:text-neutral-600 rounded-lg font-bold text-neutral-200 transition-all duration-150 py-1"
+                className="flex flex-col items-center justify-center aspect-[5/3] bg-neutral-800 hover:bg-neutral-750 border border-neutral-700 disabled:border-neutral-800 disabled:text-neutral-600 rounded-lg font-bold text-neutral-200 transition-all duration-150 py-1 shrink-0"
               >
-                <ShieldAlert className="w-4 h-4 mb-1 text-amber-500" />
-                <span className="text-[9px]">💨 도망/퇴각</span>
-              </button>
-
-              {/* Allied custom commands */}
-              <button
-                disabled={currentTurnEntity !== 'player' || isRolling || activeAllies.length === 0}
-                className="flex flex-col items-center justify-center aspect-[5/3] bg-indigo-950/80 hover:bg-indigo-900 border border-indigo-500 rounded-lg text-indigo-200 hover:text-indigo-100 disabled:bg-neutral-900 disabled:border-neutral-800 disabled:text-neutral-700 transition-all duration-150 py-1 relative overflow-hidden"
-              >
-                <Sparkles className="w-4 h-4 mb-1 text-cyan-400" />
-                <span className="text-[9px]">🛡️ 동료 스킬</span>
-                <span className="absolute top-0 right-0 px-0.5 bg-indigo-500 text-[6px] font-bold text-neutral-100 uppercase">패시브</span>
+                <ShieldAlert className="w-4 h-4 mb-2 text-amber-500 shrink-0" />
+                <span className="text-[9px]">💨 퇴각</span>
               </button>
             </div>
+
+            {/* Active Skills Selection Popover Box */}
+            {showSkillsMenu && acquiredSkills.length > 0 && (
+              <div className="bg-neutral-950 border border-neutral-850 p-2 rounded-lg flex flex-col gap-1.5 mt-1">
+                <div className="flex justify-between items-center bg-neutral-900 px-2 py-1 rounded border border-neutral-800">
+                  <span className="text-[9px] text-neutral-300 font-bold flex items-center gap-1">
+                    <BookOpen className="w-3 h-3 text-emerald-400" />
+                    시전할 스킬 터치 (전수 완료: {acquiredSkills.length}종)
+                  </span>
+                  <button 
+                    onClick={() => setShowSkillsMenu(false)}
+                    className="text-[9.5px] text-rose-450 hover:text-rose-400 font-bold px-1.5 rounded cursor-pointer"
+                  >
+                    취소
+                  </button>
+                </div>
+                <div className="grid grid-cols-1 gap-1 max-h-[140px] overflow-y-auto">
+                  {acquiredSkills.map(skillId => {
+                    const skill = SKILLS.find(s => s.id === skillId);
+                    if (!skill) return null;
+                    const skillIcon = skillId.includes('shadow') ? '👥' :
+                                      skillId.includes('golem') ? '🪨' :
+                                      skillId.includes('dragon') ? '🐉' :
+                                      skillId.includes('fire') ? '🔥' :
+                                      skillId.includes('thunder') ? '⚡' :
+                                      skillId.includes('restoration') ? '✨' :
+                                      skillId.includes('dash') ? '🏃' :
+                                      skillId.includes('shield') ? '🛡️' :
+                                      skillId.includes('execution') ? '🗡️' : '📖';
+                    return (
+                      <button
+                        key={skillId}
+                        onClick={() => castActiveSkill(skillId)}
+                        className="p-1.5 bg-neutral-900 border border-neutral-850 hover:border-emerald-500/50 hover:bg-neutral-800 rounded-lg flex items-center gap-2 text-left cursor-pointer active:scale-[0.98] transition-all"
+                      >
+                        <span className="text-base shrink-0">{skillIcon}</span>
+                        <div className="flex-grow min-w-0">
+                          <div className="flex justify-between items-center gap-1.5">
+                            <span className="text-[10px] font-bold text-neutral-200 truncate">{skill.name}</span>
+                            <span className="text-[7.5px] bg-neutral-950 px-1 py-0.5 border border-neutral-850 rounded font-black text-neutral-450 shrink-0">
+                              {skill.type === 'summon' ? '소환계' : skill.type === 'magic' ? '마법계' : '일반계'}
+                            </span>
+                          </div>
+                          <p className="text-[9.5px] text-emerald-400 font-medium truncate mt-0.5">{skill.description}</p>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* Skill / Ally Status description */}
             <div className="text-[8.5px] text-neutral-500 font-sans text-center mt-0.5 leading-relaxed">
@@ -971,7 +1209,7 @@ export default function DungeonPlay({
       <div className="bg-neutral-900 p-2 border-t border-neutral-800 flex justify-between text-[9.5px] font-mono text-neutral-400 shrink-0">
         <span>💪 근력 {stats.strength}</span>
         <span>🏃 민첩 {stats.agility}</span>
-        <span>🔥 마력 {stats.mana}</span>
+        <span>💖 체력 {stats.health}</span>
         <span>💰 {gold.toLocaleString()}G</span>
       </div>
 

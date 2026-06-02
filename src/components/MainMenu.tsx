@@ -41,7 +41,7 @@ export default function MainMenu({
       
       {/* Visual game title */}
       <div className="flex-grow flex flex-col justify-center items-center gap-4 mt-6 md:mt-10">
-        <div className="relative max-w-[380px] sm:max-w-[460px] md:max-w-[500px] w-full aspect-square flex items-center justify-center">
+        <div className="relative max-w-[410px] sm:max-w-[490px] md:max-w-[530px] w-full aspect-square flex items-center justify-center">
           {/* Clean soft ambient glow behind the logo */}
           <div className="absolute inset-4 rounded-full bg-blue-500/10 blur-2xl animate-pulse"></div>
           <img 

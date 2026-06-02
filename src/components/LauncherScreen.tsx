@@ -18,6 +18,8 @@ interface LauncherScreenProps {
   logoImg: string;
   onSelectMainGame: () => void;
   setPlayerName: (name: string) => void;
+  hasSave?: boolean;
+  onContinueGame?: () => void;
 }
 
 type TabType = 'scenarios' | 'shop' | 'player';
@@ -76,7 +78,9 @@ export default function LauncherScreen({
   recordCount,
   logoImg,
   onSelectMainGame,
-  setPlayerName
+  setPlayerName,
+  hasSave = false,
+  onContinueGame
 }: LauncherScreenProps) {
   const [activeTab, setActiveTab] = useState<TabType>('scenarios');
   const [selectedScenarioIndex, setSelectedScenarioIndex] = useState<number>(0);
@@ -141,7 +145,7 @@ export default function LauncherScreen({
       id: 'f-hunter',
       title: '등급 보류 : F급 헌터 연대기',
       tagline: '회귀 속에서 조종되는 오리지널 구조 루프',
-      description: '체계적인 신체 피로도 매니지먼트와 S급 히로인 협력 관계 구축을 통해 100일 뒤 닥쳐오는 전면적 서울 대공습을 저지하십시오. 16개의 영혼 구형 기억 편린을 복구하여 인과의 비밀을 전복할 수 있습니다.',
+      description: '체계적인 신체 피로도 매니지먼트와 S급 히로인 협력 관계 구축을 통해 60일 뒤 닥쳐오는 전면적 서울 대공습을 저지하십시오. 16개의 영혼 구형 기억 편린을 복구하여 인과의 비밀을 전복할 수 있습니다.',
       badge: '시즌 1 에피소드 오픈',
       isAvailable: true,
       bgGradient: 'from-blue-950/60 via-zinc-900 to-zinc-950',
@@ -405,15 +409,41 @@ export default function LauncherScreen({
                     </div>
 
                     {/* Footer values and action buttons */}
-                    <div className="flex justify-end items-center border-t border-zinc-800/60 pt-3 mt-1 relative z-10">
+                    <div className="flex justify-end items-center border-t border-zinc-800/60 pt-3 mt-1 relative z-10 gap-2">
                       {scenarios[selectedScenarioIndex].isAvailable ? (
-                        <button
-                          onClick={handleEnterChronicle}
-                          className="bg-zinc-100 hover:bg-white text-zinc-950 px-4 py-2 text-xs font-bold rounded-lg cursor-pointer flex items-center gap-1 hover:scale-105 active:scale-95 transition-all shadow-md font-sans"
-                        >
-                          <Gamepad2 className="w-3.5 h-3.5" />
-                          <span>연대기 진입</span>
-                        </button>
+                        scenarios[selectedScenarioIndex].id === 'f-hunter' && hasSave ? (
+                          <>
+                            <button
+                              onClick={() => {
+                                const confirmNew = window.confirm(
+                                  "⚠️ 경고! 이미 기존에 저장된 'F급 헌터 연대기' 진행 상황이 존재합니다.\n\n새로 시작하시면 현재까지 성장한 플레이어 스탯 및 던전 진행도가 전부 초기화됩니다. 정말로 '새 출발(새로 시작)'하시겠습니까?"
+                                );
+                                if (confirmNew) {
+                                  handleEnterChronicle();
+                                }
+                              }}
+                              className="bg-zinc-850 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 px-3 py-2 text-xs font-bold rounded-lg cursor-pointer flex items-center gap-1 transition-all font-sans border border-zinc-800"
+                            >
+                              <RotateCcw className="w-3.5 h-3.5" />
+                              <span>새로 시작</span>
+                            </button>
+                            <button
+                              onClick={onContinueGame}
+                              className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white px-4 py-2 text-xs font-black rounded-lg cursor-pointer flex items-center gap-1.5 hover:scale-105 active:scale-95 transition-all shadow-lg shadow-emerald-950/40 font-sans animate-pulse"
+                            >
+                              <Gamepad2 className="w-3.5 h-3.5" />
+                              <span>이어하기 (계속)</span>
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            onClick={handleEnterChronicle}
+                            className="bg-zinc-100 hover:bg-white text-zinc-950 px-4 py-2 text-xs font-bold rounded-lg cursor-pointer flex items-center gap-1 hover:scale-105 active:scale-95 transition-all shadow-md font-sans"
+                          >
+                            <Gamepad2 className="w-3.5 h-3.5" />
+                            <span>연대기 진입</span>
+                          </button>
+                        )
                       ) : (
                         <span className="text-xs font-bold text-zinc-500 flex items-center gap-1.5 select-none bg-zinc-950/80 border border-zinc-850 px-3 py-1.5 rounded-lg">
                           <ShieldAlert className="w-3.5 h-3.5 text-zinc-600" />
@@ -1107,7 +1137,7 @@ export default function LauncherScreen({
                     src={logoImg}
                     alt="Logo"
                     referrerPolicy="no-referrer"
-                    className="w-40 md:w-48 h-auto select-none pointer-events-none drop-shadow-[0_0_20px_rgba(59,130,246,0.3)]"
+                    className="w-[486px] md:w-[518px] h-auto select-none pointer-events-none drop-shadow-[0_0_20px_rgba(59,130,246,0.3)]"
                   />
                 </div>
               ) : (
