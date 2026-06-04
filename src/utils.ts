@@ -18,14 +18,16 @@ export function getAssetPath(relativePath: string): string {
     return `/${cleanPath}`;
   }
   
-  // On GitHub Pages or subpath-hosted deployments, let's extract the repository / subpath segment.
+  // On GitHub Pages or subpath-hosted deployments, let's extract the repository / subpath segment dynamically.
   const segments = pathname.split('/').filter(Boolean);
   if (segments.length > 0) {
     const firstSegment = segments[0];
     
-    // Check if the current environment's first pathname is 'textHunter', which is our repo name
-    if (firstSegment === 'textHunter') {
-      return `/textHunter/${cleanPath}`;
+    // Ignore direct files like 'index.html' or 'index.php'
+    const isFile = firstSegment.includes('.') || firstSegment === 'index';
+    
+    if (!isFile) {
+      return `/${firstSegment}/${cleanPath}`;
     }
   }
   
