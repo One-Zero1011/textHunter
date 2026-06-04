@@ -12,6 +12,7 @@ import {
   Sparkles, CornerDownLeft, AlertCircle, ShoppingBag, Award, BookOpen
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { getAssetPath } from '../utils';
 import { getActiveStoryForNpc, interpolateText, CHAT_STORIES, ChatStory, ChatStoryChoice } from '../data/chatStories';
 
 interface PhoneModalProps {
@@ -951,7 +952,7 @@ export default function PhoneModal({
                         <div className="flex gap-3 items-center">
                           <div className="w-12 h-12 rounded-xl bg-zinc-950 border border-zinc-850 flex items-center justify-center text-xl shadow-inner overflow-hidden">
                             {npc.id === 'lim' ? (
-                              <img src="images/portraits/imsoyeon/basic.png" alt={npc.name} referrerPolicy="no-referrer" className="w-full h-full object-cover object-top" />
+                              <img src={getAssetPath("images/portraits/imsoyeon/basic.png")} alt={npc.name} referrerPolicy="no-referrer" className="w-full h-full object-cover object-top" />
                             ) : (
                               npc.avatarUrl
                             )}
@@ -998,7 +999,7 @@ export default function PhoneModal({
                         <div className="flex justify-center mb-3">
                           {npc.id === 'lim' ? (
                             <div className="w-24 h-24 rounded-2xl bg-zinc-950 border border-zinc-855 shadow-md overflow-hidden relative">
-                              <img src="images/portraits/imsoyeon/basic.png" alt={npc.name} referrerPolicy="no-referrer" className="w-full h-full object-cover object-top" />
+                              <img src={getAssetPath("images/portraits/imsoyeon/basic.png")} alt={npc.name} referrerPolicy="no-referrer" className="w-full h-full object-cover object-top" />
                             </div>
                           ) : (
                             <div className="text-4xl text-center mb-1">{npc.avatarUrl}</div>
@@ -1092,7 +1093,7 @@ export default function PhoneModal({
                           <div className="flex gap-3 items-center flex-1 min-w-0">
                             <div className="w-10 h-10 rounded-xl bg-zinc-950 border border-zinc-850 flex items-center justify-center text-base shadow-inner relative overflow-hidden">
                               {npc.id === 'lim' ? (
-                                <img src="images/portraits/imsoyeon/basic.png" alt={npc.name} referrerPolicy="no-referrer" className="w-full h-full object-cover object-top" />
+                                <img src={getAssetPath("images/portraits/imsoyeon/basic.png")} alt={npc.name} referrerPolicy="no-referrer" className="w-full h-full object-cover object-top" />
                               ) : (
                                 npc.avatarUrl
                               )}

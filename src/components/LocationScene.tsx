@@ -10,6 +10,7 @@ import {
   MessageCircle, Coffee, Compass, X, Home
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { getAssetPath } from '../utils';
 import { 
   TRAINING_ACTIVITIES, 
   RECOVERY_ACTIVITIES, 
@@ -681,7 +682,7 @@ export default function LocationScene({
               <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-4/5 h-4/5 bg-gradient-to-tr from-violet-500/10 to-blue-500/10 rounded-full blur-3xl" />
               
               <img
-                src="images/portraits/imsoyeon/basic.png"
+                src={getAssetPath("images/portraits/imsoyeon/basic.png")}
                 alt="임소연 미연시 초상화"
                 referrerPolicy="no-referrer"
                 className="w-full h-full max-h-[320px] md:max-h-[380px] object-contain object-bottom z-10 select-none pointer-events-none drop-shadow-[0_8px_32px_rgba(139,92,246,0.25)] transition-transform duration-700 hover:scale-[1.025]"

@@ -10,6 +10,7 @@ import {
   Sparkles, ShieldAlert, Award, CreditCard, RotateCcw, Flame,
   Pencil, X
 } from 'lucide-react';
+import { getAssetPath } from '../utils';
 
 interface LauncherScreenProps {
   playerName: string;
@@ -422,7 +423,7 @@ export default function LauncherScreen({
                         scenarios[selectedScenarioIndex].image && (
                           <div className="mt-4 relative z-10 rounded-xl overflow-hidden border border-zinc-800/80 shadow-md aspect-[3/4] max-h-[420px] md:max-h-[460px] bg-zinc-950 shrink-0 animate-fadeIn flex items-center justify-center">
                             <img 
-                              src={scenarios[selectedScenarioIndex].image} 
+                              src={getAssetPath(scenarios[selectedScenarioIndex].image)} 
                               alt={scenarios[selectedScenarioIndex].title}
                               referrerPolicy="no-referrer"
                               className="w-full h-full object-contain transition-transform duration-500 hover:scale-[1.02]"
