@@ -4,8 +4,13 @@ import path from 'path';
 import {defineConfig} from 'vite';
 
 export default defineConfig(() => {
+  // Use GITHUB_REPOSITORY if available to set the correct base path for GitHub Pages
+  // Example: "parkjihoosoda/textHunter" -> "textHunter"
+  const repoName = process.env.GITHUB_REPOSITORY ? process.env.GITHUB_REPOSITORY.split('/')[1] : '';
+  const basePath = repoName ? `/${repoName}/` : '/';
+
   return {
-    base: './',
+    base: basePath,
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {
