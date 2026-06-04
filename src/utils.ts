@@ -6,32 +6,35 @@ export function getAssetPath(relativePath: string): string {
   // Clean leading slash from relativePath to normalize it
   const cleanPath = relativePath.startsWith('/') ? relativePath.slice(1) : relativePath;
   
+  // Dynamically resolve the base directory pathname of the current webpage.
+  // This supports all hosting environments: localhost, preview servers (.run.app), nested repository paths
+  // on GitHub Pages (e.g. /my-repo/), or multi-segment game aggregators (e.g. itch.io).
   const pathname = window.location.pathname;
   
-  // Detect if running on localhost or inside standard containers/AI Studio previews
-  const isLocalhost = window.location.hostname === 'localhost' || 
-                      window.location.hostname === '127.0.0.1' || 
-                      window.location.hostname.includes('192.168.') || 
-                      window.location.hostname.includes('.run.app');
-  
-  if (isLocalhost) {
-    return `/${cleanPath}`;
-  }
-  
-  // On GitHub Pages or subpath-hosted deployments, let's extract the repository / subpath segment dynamically.
-  const segments = pathname.split('/').filter(Boolean);
-  if (segments.length > 0) {
-    const firstSegment = segments[0];
-    
-    // Ignore direct files like 'index.html' or 'index.php'
-    const isFile = firstSegment.includes('.') || firstSegment === 'index';
-    
-    if (!isFile) {
-      return `/${firstSegment}/${cleanPath}`;
+  let directoryPath = '/';
+  if (pathname.endsWith('/')) {
+    directoryPath = pathname;
+  } else {
+    const lastSlashIndex = pathname.lastIndexOf('/');
+    if (lastSlashIndex >= 0) {
+      const lastSegment = pathname.substring(lastSlashIndex + 1);
+      // If the last segment has a dot (e.g. index.html) or is "index", strip it to retrieve the directory.
+      if (lastSegment.includes('.') || lastSegment === 'index' || lastSegment === 'index.html') {
+        directoryPath = pathname.substring(0, lastSlashIndex + 1);
+      } else {
+        // If it looks like a folder name (e.g. /textHunter), include it with a trailing slash.
+        directoryPath = pathname + '/';
+      }
     }
   }
   
-  // Fall back to relative path if we cannot determine the exact base context,
-  // which works fine on correct trailing-slash settings.
-  return `/${cleanPath}`;
+  // Ensure the directory path originates and terminates with a single slash
+  if (!directoryPath.startsWith('/')) {
+    directoryPath = '/' + directoryPath;
+  }
+  if (!directoryPath.endsWith('/')) {
+    directoryPath = directoryPath + '/';
+  }
+  
+  return `${directoryPath}${cleanPath}`;
 }
