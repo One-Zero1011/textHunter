@@ -25,7 +25,8 @@ import {
   Settings, Zap, Swords, RotateCcw, AlertTriangle, ShieldCheck, Gamepad2, FolderOpen
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-const logoImg = 'images/Logo.png';
+import { getAssetPath } from './utils';
+const logoImg = getAssetPath('images/Logo.png');
 
 export default function App() {
   // Game state
