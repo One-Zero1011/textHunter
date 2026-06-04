@@ -26,7 +26,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 // @ts-ignore
-import logoImg from '../images/Logo.png';
+import logoImg from '../public/images/Logo.png';
 
 export default function App() {
   // Game state

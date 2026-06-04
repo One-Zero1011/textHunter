@@ -156,7 +156,7 @@ export default function LauncherScreen({
       isAvailable: true,
       bgGradient: 'from-blue-950/60 via-zinc-900 to-zinc-950',
       illustEmoji: '⏳',
-      image: '/images/Title/Senario01.png'
+      image: 'images/Title/Senario01.png'
     },
     {
       id: 'automata-awakening',
