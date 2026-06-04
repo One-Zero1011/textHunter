@@ -74,6 +74,114 @@ export default function LocationScene({
 
   const [narrativeFeedback, setNarrativeFeedback] = useState<string | null>(null);
 
+  // Dynamic Typewriter & Shake Screen Effects
+  const [displayedDialogue, setDisplayedDialogue] = useState<string>('');
+  const [isTypingDialogue, setIsTypingDialogue] = useState<boolean>(false);
+  const [displayedFeedback, setDisplayedFeedback] = useState<string>('');
+  const [isTypingFeedback, setIsTypingFeedback] = useState<boolean>(false);
+  const [shakeActive, setShakeActive] = useState<boolean>(false);
+
+  const triggerShake = () => {
+    setShakeActive(true);
+    setTimeout(() => {
+      setShakeActive(false);
+    }, 350);
+  };
+
+  useEffect(() => {
+    if (!activeNpcEvent?.dialogue) {
+      setDisplayedDialogue('');
+      setIsTypingDialogue(false);
+      return;
+    }
+
+    const fullText = activeNpcEvent.dialogue;
+    setDisplayedDialogue('');
+    setIsTypingDialogue(true);
+
+    let currentIndex = 0;
+    let timer: NodeJS.Timeout;
+
+    const typeNextChar = () => {
+      if (currentIndex < fullText.length) {
+        setDisplayedDialogue(fullText.substring(0, currentIndex + 1));
+        const nextChar = fullText[currentIndex];
+        currentIndex++;
+        
+        let delay = 12; // Base speed: 12ms per char
+        if (nextChar === '.' || nextChar === '?' || nextChar === '!') {
+          delay = 140; // pause at punctuation
+        } else if (nextChar === '\n') {
+          delay = 200; // longer pause at new lines
+        } else if (nextChar === ',') {
+          delay = 60; // short pause at comma
+        }
+        timer = setTimeout(typeNextChar, delay);
+      } else {
+        setIsTypingDialogue(false);
+      }
+    };
+
+    timer = setTimeout(typeNextChar, 10);
+
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [activeNpcEvent?.dialogue]);
+
+  useEffect(() => {
+    if (!narrativeFeedback) {
+      setDisplayedFeedback('');
+      setIsTypingFeedback(false);
+      return;
+    }
+
+    const fullText = narrativeFeedback;
+    setDisplayedFeedback('');
+    setIsTypingFeedback(true);
+
+    let currentIndex = 0;
+    let timer: NodeJS.Timeout;
+
+    const typeNextChar = () => {
+      if (currentIndex < fullText.length) {
+        setDisplayedFeedback(fullText.substring(0, currentIndex + 1));
+        const nextChar = fullText[currentIndex];
+        currentIndex++;
+        
+        let delay = 10;
+        if (nextChar === '.' || nextChar === '?' || nextChar === '!') {
+          delay = 100;
+        } else if (nextChar === ',') {
+          delay = 50;
+        }
+        timer = setTimeout(typeNextChar, delay);
+      } else {
+        setIsTypingFeedback(false);
+      }
+    };
+
+    timer = setTimeout(typeNextChar, 10);
+
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [narrativeFeedback]);
+
+  const handleSkipDialogueTyping = () => {
+    if (isTypingDialogue && activeNpcEvent?.dialogue) {
+      setDisplayedDialogue(activeNpcEvent.dialogue);
+      setIsTypingDialogue(false);
+    }
+  };
+
+  const handleSkipFeedbackTyping = () => {
+    if (isTypingFeedback && narrativeFeedback) {
+      setDisplayedFeedback(narrativeFeedback);
+      setIsTypingFeedback(false);
+    }
+  };
+
   const handleFocusedHeal = (part: keyof BodyPartsHP) => {
     if (gold < 3000) {
       alert("🚨 집중 치료를 위한 자금(3,000 골드)이 부족합니다.");
@@ -102,6 +210,7 @@ export default function LocationScene({
       rightLeg: '오른다리 (Right Leg)',
     };
 
+    triggerShake();
     setNarrativeFeedback(`🏥 서울역 메디컬에서 집중 치료를 성품 하였습니다. 소실 위기였던 [${partNamesKo[part]}] 부위가 100% 온전하게 완치되었습니다! (+15 기력 회복, 3,000 골드 소모)`);
     setSelectedDest(null);
     onAdvancePhase();
@@ -137,6 +246,7 @@ export default function LocationScene({
       return nextHP;
     });
 
+    triggerShake();
     setNarrativeFeedback(`🏥 서울역 메디컬 전신 광역 복합 열선 치료를 완료했습니다. 소실되지 않은 모든 신체 활성 부위의 상흔이 각각 +70 HP씩 대대적으로 치유되었습니다! (+25 기력 회복, 5,000 골드 소모)`);
     setSelectedDest(null);
     onAdvancePhase();
@@ -144,6 +254,7 @@ export default function LocationScene({
 
   const handleHomeSleep = () => {
     setFatigue(prev => Math.min(100, prev + 70));
+    triggerShake();
     setNarrativeFeedback(`🛌 아공간 헌터 보안 안전가옥 침대에서 쾌적하게 푹 잠을 잤습니다. 깊고 평화로운 수면 끝에 지쳐있던 정신과 기력이 +70 크게 맑아졌습니다!`);
     setSelectedDest(null);
     onAdvancePhase();
@@ -156,6 +267,7 @@ export default function LocationScene({
     }
     setGold(prev => prev - 1500);
     setFatigue(prev => Math.min(100, prev + 75));
+    triggerShake();
     setNarrativeFeedback(`🍵 한방 고에너지 특효 마제 차의 뜨뜻한 김을 맡으며 전신 마나 장벽을 환원했습니다. 막혀있던 경맥 순환이 활성화되며 기력이 +75 대폭 상승 복원되었습니다! (-1,500 골드 소모)`);
     setSelectedDest(null);
     onAdvancePhase();
@@ -410,6 +522,7 @@ export default function LocationScene({
       onCollectRecord();
     }
 
+    triggerShake();
     if (activeNpcEvent) {
       setActiveNpcEvent({
         ...activeNpcEvent,
@@ -455,12 +568,15 @@ export default function LocationScene({
       msg = `${jobAct.messageFormula(pay).replace('(+25 피로도)', '(-25 피로도)')}`;
     }
 
+    triggerShake();
     setNarrativeFeedback(msg);
     onAdvancePhase();
   };
 
   return (
     <div className={`flex flex-col flex-1 p-3 md:p-4 gap-3 text-zinc-100 overflow-y-auto text-sm max-h-full relative scrollbar-thin transition-colors duration-1000 ${
+      shakeActive ? 'animate-shake' : ''
+    } ${
       isCriticallyRed 
         ? 'bg-gradient-to-b from-rose-950/15 to-zinc-950 shadow-[inset_0_0_50px_rgba(244,63,94,0.08)]' 
         : isModeratelyRed 
@@ -596,14 +712,18 @@ export default function LocationScene({
                 </div>
 
                 {/* Speech Box */}
-                <div className="bg-zinc-950/90 p-3.5 md:p-4 rounded-xl border border-violet-900/30 text-xs text-zinc-100 font-semibold leading-relaxed font-sans mt-1 shadow-inner select-all relative group min-h-[120px] max-h-[180px] overflow-y-auto scrollbar-thin">
+                <div 
+                  onClick={handleSkipDialogueTyping}
+                  className="bg-zinc-950/90 p-3.5 md:p-4 rounded-xl border border-violet-900/30 text-xs text-zinc-100 font-semibold leading-relaxed font-sans mt-1 shadow-inner select-all relative group min-h-[120px] max-h-[180px] overflow-y-auto scrollbar-thin cursor-pointer hover:border-violet-700/50 transition-colors"
+                >
                   <p className="break-keep whitespace-pre-line text-zinc-200 indent-1 font-sans font-semibold text-[11.5px] leading-relaxed tracking-wide">
-                    {activeNpcEvent.dialogue}
+                    {displayedDialogue}
+                    {isTypingDialogue && <span className="inline-block w-1.5 h-3 ml-0.5 bg-violet-400 animate-pulse" />}
                   </p>
                   
                   {/* blinking visual novel cursor */}
                   <div className="absolute bottom-2.5 right-3 font-mono text-[8.5px] text-violet-400 font-bold flex items-center gap-1.5 opacity-85 select-none animate-pulse">
-                    <span>▼ {activeNpcEvent.isOutcome ? 'CONCLUDED' : 'DECISION PENDING'}</span>
+                    <span>▼ {activeNpcEvent.isOutcome ? 'CONCLUDED' : 'DECISION PENDING'} {isTypingDialogue && '(SKIP)'}</span>
                   </div>
                 </div>
               </div>
@@ -666,8 +786,14 @@ export default function LocationScene({
             </div>
 
             {/* dialogue box style */}
-            <div className="bg-zinc-850/50 p-3.5 rounded-xl border border-zinc-800/40 text-zinc-200 italic text-xs leading-relaxed font-sans break-keep shadow-inner max-h-[160px] overflow-y-auto scrollbar-thin">
-              {activeNpcEvent.dialogue}
+            <div 
+              onClick={handleSkipDialogueTyping}
+              className="bg-zinc-850/50 p-3.5 rounded-xl border border-zinc-800/40 text-zinc-200 italic text-xs leading-relaxed font-sans break-keep shadow-inner max-h-[160px] overflow-y-auto scrollbar-thin cursor-pointer hover:border-blue-500/30 transition-colors"
+            >
+              <p className="whitespace-pre-line">
+                {displayedDialogue}
+                {isTypingDialogue && <span className="inline-block w-1.5 h-3 ml-0.5 bg-zinc-400 animate-pulse" />}
+              </p>
             </div>
 
             <div className="flex flex-col gap-1.5 border-t border-zinc-800 pt-2.5">
@@ -695,10 +821,16 @@ export default function LocationScene({
         )
       ) : narrativeFeedback ? (
         /* STANDARD DIALOGUE OUTCOME FEEDBACK VIEW */
-        <div className="p-4 bg-zinc-900 border border-zinc-800/80 rounded-2xl flex flex-col gap-3 relative shadow-lg">
+        <div className="p-4 bg-zinc-900 border border-zinc-800/80 rounded-2xl flex flex-col gap-3 relative shadow-lg animate-fadeIn">
           <span className="text-[10px] font-mono text-blue-400 font-bold uppercase tracking-widest block mb-0.5">▲ 활동 섭렵 및 경계 로그</span>
-          <div className="bg-zinc-950/60 p-3.5 rounded-xl text-xs text-zinc-200 border border-zinc-850 leading-relaxed break-keep font-sans">
-            {narrativeFeedback}
+          <div 
+            onClick={handleSkipFeedbackTyping}
+            className="bg-zinc-950/60 p-3.5 rounded-xl text-xs text-zinc-200 border border-zinc-850 leading-relaxed break-keep font-sans cursor-pointer hover:border-zinc-700/50 transition-colors"
+          >
+            <p className="whitespace-pre-line">
+              {displayedFeedback}
+              {isTypingFeedback && <span className="inline-block w-1.5 h-3 ml-0.5 bg-zinc-400 animate-pulse" />}
+            </p>
           </div>
           <button
             onClick={() => setNarrativeFeedback(null)}

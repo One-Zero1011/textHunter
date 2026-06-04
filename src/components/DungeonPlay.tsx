@@ -81,6 +81,17 @@ export default function DungeonPlay({
   const [evadedThisTurn, setEvadedThisTurn] = useState<boolean>(false);
   const [shieldActive, setShieldActive] = useState<boolean>(false);
 
+  // Combat Floating Popups
+  const [combatPopups, setCombatPopups] = useState<{ id: string; text: string; side: 'player' | 'enemy'; type: 'damage' | 'heal' | 'evade' | 'critical' }[]>([]);
+
+  const triggerCombatPopup = (text: string, side: 'player' | 'enemy', type: 'damage' | 'heal' | 'evade' | 'critical') => {
+    const id = Math.random().toString();
+    setCombatPopups(prev => [...prev, { id, text, side, type }]);
+    setTimeout(() => {
+      setCombatPopups(prev => prev.filter(p => p.id !== id));
+    }, 1200);
+  };
+
   useEffect(() => {
     // Generate specialized non-linear graph map
     const generatedRooms = generateNonLinearDungeonMap(dungeon);
@@ -396,6 +407,17 @@ export default function DungeonPlay({
       addBattleLog(logMsg, logType);
       setIsRolling(false);
       
+      // Floating combat popups for player core active skills
+      if (damage > 0) {
+        const isCrit = (skillId === 'skill_summon_dragon' || skillId === 'skill_hunter_execution' || skillId === 'skill_summon_shadow');
+        triggerCombatPopup(`-${damage}`, 'enemy', isCrit ? 'critical' : 'damage');
+      }
+      if (skillId === 'skill_magic_restoration') {
+        triggerCombatPopup(`+35 HP (All)`, 'player', 'heal');
+      } else if (skillId === 'skill_hunter_shield' || skillId === 'skill_summon_golem') {
+        triggerCombatPopup(`🛡️ BARRIER`, 'player', 'heal');
+      }
+      
       if (nextHp <= 0) {
         setTimeout(() => {
           endBattle(true);
@@ -452,6 +474,9 @@ export default function DungeonPlay({
       addBattleLog(`⚔️ 주사위 🎲 [${actualRoll}] 굴림! 적에게 ${damage}의 데미지를 가했습니다!`, 'player');
       setIsRolling(false);
 
+      // Trigger combat popup for normal attacks
+      triggerCombatPopup(`-${damage}`, 'enemy', actualRoll >= 18 ? 'critical' : 'damage');
+
       if (nextHp <= 0) {
         setTimeout(() => {
           endBattle(true);
@@ -480,24 +505,31 @@ export default function DungeonPlay({
           setShieldActive(true);
           setBaekSkillUsed(true);
           addBattleLog(`🛡️ 백운혁이 거대한 방패를 다잡으며 전설적 클래스 [희생의 방패] 오라를 시전합니다! (나머지 턴 동안 위기 차단)`, 'skill');
+          triggerCombatPopup(`🛡️ BARRIER`, 'player', 'heal');
         } else {
           dmg = 25 + stats.intellect; // shield bash
           addBattleLog(`🛡️ 백운혁의 방패 치기! 적을 넉백시키고 ${dmg}의 데미지를 부여했습니다.`, 'ally');
+          triggerCombatPopup(`-${dmg}`, 'enemy', 'damage');
         }
       } else if (allyId === 'geum') {
         dmg = 45 + Math.floor(stats.health * 0.4);
         addBattleLog(`⚡ 금채란이 공중에 수십 발의 황금 마석 탄환을 발포해 ${dmg}의 폭발 데미지를 뿜었습니다!`, 'ally');
+        triggerCombatPopup(`-${dmg}`, 'enemy', 'critical');
       } else if (allyId === 'lim') {
         addBattleLog(`📖 임소연이 가죽 고서의 인과율을 복제하여 파티 공격력을 보정합니다. (모든 주사위 크리티컬 보정)`, 'ally');
+        triggerCombatPopup(`📖 OPTIMIZE`, 'player', 'heal');
       } else if (allyId === 'kang') {
         dmg = 40 + Math.floor(stats.agility * 0.3) + Math.floor(stats.health * 0.2);
         addBattleLog(`🎯 B급 스나이퍼 강다인이 저격 라이플로 적의 심장을 관통하는 사격을 감행해 ${dmg}의 관통 데미지를 입혔습니다!`, 'ally');
+        triggerCombatPopup(`-${dmg}`, 'enemy', 'critical');
       } else if (allyId === 'yoo') {
         dmg = 28 + Math.floor(stats.intellect * 0.3);
         addBattleLog(`🧭 C급 탐측사 유채은이 굴절 유도 마나 공간 파동탄을 쏘아 적의 밸런스를 흩뜨리며 ${dmg}의 정밀 치명 데미지를 가했습니다!`, 'ally');
+        triggerCombatPopup(`-${dmg}`, 'enemy', 'damage');
       } else if (allyId === 'choi') {
         dmg = 35 + Math.floor(stats.strength * 0.4);
         addBattleLog(`🪓 D급 강습 전투원 최강식이 고함을 지르며 거대한 공격 도끼를 휘둘러 ${dmg}의 타격 데미지를 입혔습니다!`, 'ally');
+        triggerCombatPopup(`-${dmg}`, 'enemy', 'damage');
       } else if (allyId === 'park') {
         dmg = 12 + Math.floor(stats.intellect * 0.1);
         setBodyPartsHP(prev => {
@@ -514,9 +546,12 @@ export default function DungeonPlay({
         });
         addBattleLog(`🧪 E급 보조 의료원 박소록이 [진통 영양제]를 주사했습니다! 가장 치명적인 부위를 보완해 +20 HP를 치유했습니다!`, 'heal');
         addBattleLog(`🧪 박소록이 날카로운 주사 바늘과 메스로 엄호 사격해 ${dmg}의 데미지를 보충했습니다.`, 'ally');
+        triggerCombatPopup(`+20 HP`, 'player', 'heal');
+        setTimeout(() => triggerCombatPopup(`-${dmg}`, 'enemy', 'damage'), 400);
       } else if (allyId === 'shin') {
         dmg = 10 + Math.floor(stats.strength * 0.1);
         addBattleLog(`📦 F급 신현민이 뒤쪽에서 골동품 수집 고압 마정 수류탄 보따리를 마구 투사해 ${dmg}의 화력 폭발 데미지를 흩뿌렸습니다!`, 'ally');
+        triggerCombatPopup(`-${dmg}`, 'enemy', 'damage');
       }
       
       if (dmg > 0) {
@@ -546,6 +581,7 @@ export default function DungeonPlay({
       
       if (rolledEvade < evadeChance) {
         addBattleLog(`💨 슈욱! 당신은 민첩하게 측면으로 축을 옮겨 몬스터의 발톱을 [회피]했습니다!`, 'evade');
+        triggerCombatPopup('💨 EVADE', 'player', 'evade');
         nextTurn();
         return;
       }
@@ -588,6 +624,7 @@ export default function DungeonPlay({
       // Baek Un-hyeok's shield intervention
       if (shieldActive || (activeAllies.some(a => a.id === 'baek') && targetedPart === 'head' && Math.random() < 0.7)) {
         addBattleLog(`🛡️ 백운혁이 뛰어들어 "어리석은 놈!"이라고 소리치며 즉사에 빠질 공격을 방패로 가로막았습니다!`, 'skill');
+        triggerCombatPopup('🛡️ BLOCKED', 'player', 'evade');
         setShieldActive(false);
         nextTurn();
         return;
@@ -598,6 +635,7 @@ export default function DungeonPlay({
       const nextHP = Math.max(0, currentPartHP - netDmg);
 
       addBattleLog(`💥 몬스터가 당신의 [${partLabel}]를 난폭하게 격타해 ${netDmg}의 아픔을 주었습니다. (부위 HP: ${nextHP}/100)`, 'enemy');
+      triggerCombatPopup(`-${netDmg} HP`, 'player', 'damage');
 
       // Critical conditions checked directly outside of state updater
       if ((targetedPart === 'head' || targetedPart === 'torso') && nextHP <= 0) {
@@ -685,6 +723,94 @@ export default function DungeonPlay({
 
   const handleLeaveDungeon = (success: boolean) => {
     onFinishDungeon(success, [], `자진 퇴각하여 본체 및 헌터 장비를 정화하였습니다.`);
+  };
+
+  const renderRichBattleLog = (text: string, type: CombatLog['type']) => {
+    // Regex splits the log using a set of delimiters for damage numbers, ranks, character names, and action terms
+    const regex = /(\[[^\]]+\]|🎲 \[[0-9]+\]|\b(?!HP\b)\d+\b|S급|A급|B급|C급|D급|E급|F급|박지후|백운혁|금채란|임소연|강다인|유채은|최강식|박소록|신현민|회피|사망|보호막|치유|크리티컬|데미지|-\d+)/g;
+    
+    const parts = text.split(regex);
+    return parts.map((part, index) => {
+      if (!part) return null;
+      
+      // Match custom brackets
+      if (part.startsWith('[') && part.endsWith(']')) {
+        const cleaned = part.slice(1, -1);
+        return (
+          <span key={index} className="px-1 py-0.5 rounded-md text-[8.5px] font-bold mx-0.5 bg-neutral-900 border border-violet-900/40 text-violet-300 font-sans shadow-sm inline-block">
+            {cleaned}
+          </span>
+        );
+      }
+      
+      // Match dice roll e.g. 🎲 [20]
+      if (part.startsWith('🎲 [')) {
+        return (
+          <span key={index} className="inline-flex items-center gap-0.5 bg-orange-950/80 text-orange-400 font-sans font-black border border-orange-850 px-1 py-0.5 text-[8.5px] rounded mx-0.5 animate-pulse">
+            {part}
+          </span>
+        );
+      }
+      
+      // Match plain numeric strings
+      if (/^\d+$/.test(part)) {
+        let numColor = 'text-amber-400';
+        if (type === 'player' || type === 'skill') {
+          numColor = 'text-emerald-400 font-black font-mono inline-block px-1.5 py-0.2 bg-emerald-950/40 rounded border border-emerald-900/30 text-[10.5px] mx-0.5';
+        } else if (type === 'enemy') {
+          numColor = 'text-rose-400 font-black font-mono inline-block px-1.5 py-0.2 bg-rose-950/40 rounded border border-rose-900/30 text-[10.5px] mx-0.5';
+        } else if (type === 'heal') {
+          numColor = 'text-teal-400 font-black font-mono inline-block px-1.5 py-0.2 bg-teal-950/40 rounded border border-teal-900/30 text-[10.5px] mx-0.5';
+        } else {
+          numColor = 'text-zinc-200 font-semibold font-mono';
+        }
+        return (
+          <span key={index} className={`${numColor}`}>
+            {part}
+          </span>
+        );
+      }
+
+      // Match character names
+      if (['박지후', '백운혁', '금채란', '임소연', '강다인', '유채은', '최강식', '박소록', '신현민'].includes(part)) {
+        const npcColors: { [key: string]: string } = {
+          '백운혁': 'text-amber-400 font-extrabold',
+          '금채란': 'text-yellow-300 font-extrabold',
+          '임소연': 'text-purple-300 font-extrabold',
+          '강다인': 'text-sky-300 font-semibold',
+          '유채은': 'text-teal-300 font-semibold',
+          '최강식': 'text-orange-300 font-semibold',
+          '박소록': 'text-emerald-400 font-semibold',
+          '신현민': 'text-zinc-400 font-medium'
+        };
+        const styleClass = npcColors[part] || 'text-cyan-400 font-extrabold';
+        return <span key={index} className={`${styleClass} font-sans`}>{part}</span>;
+      }
+      
+      // Rank labels like S급/F급
+      if (/^[A-FS]급$/.test(part)) {
+        return <span key={index} className="text-yellow-400 font-extrabold px-1 py-0.2 bg-amber-950/80 rounded border border-amber-800/80 text-[8.5px] mx-0.5">{part}</span>;
+      }
+
+      // Action modifiers
+      if (part === '회피') {
+        return <span key={index} className="text-cyan-400 font-black font-sans px-0.5 border border-cyan-900/30 bg-cyan-950/20 rounded">회피</span>;
+      }
+      if (part === '사망') {
+        return <span key={index} className="text-red-500 font-black font-sans px-1 border border-red-950 bg-red-955/35 rounded animate-bounce">사망</span>;
+      }
+      if (part === '보호막') {
+        return <span key={index} className="text-amber-400 font-bold font-sans px-0.5">보호막</span>;
+      }
+      if (part === '치유') {
+        return <span key={index} className="text-teal-400 font-black font-sans px-0.5 border border-teal-900/30 bg-teal-950/45 rounded">치유</span>;
+      }
+      if (part === '크리티컬') {
+        return <span key={index} className="text-orange-400 font-black font-sans px-1 bg-orange-950/40 border border-orange-800 rounded animate-pulse">크리티컬</span>;
+      }
+      
+      return <span key={index}>{part}</span>;
+    });
   };
 
   const currentTurnEntity = initiativeOrder[currentTurnIdx];
@@ -1002,7 +1128,30 @@ export default function DungeonPlay({
           {/* COMBATANTS HP DISPLAY PORTRAITS */}
           <div className="grid grid-cols-2 gap-2 mt-0.5">
             {/* Friendly Heroes side */}
-            <div className="flex flex-col gap-1.5 p-2 bg-neutral-900/60 border border-emerald-950/60 rounded-xl">
+            <div className="relative flex flex-col gap-1.5 p-2 bg-neutral-900/60 border border-emerald-950/60 rounded-xl overflow-hidden min-h-[140px]">
+              {/* Floating Combat Popups over Allied panel */}
+              <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center overflow-hidden z-20">
+                <AnimatePresence>
+                  {combatPopups.filter(p => p.side === 'player').map(p => {
+                    let color = 'text-rose-500 font-extrabold text-[15px] drop-shadow-[0_0_6px_rgba(239,68,68,0.7)]';
+                    if (p.type === 'heal') color = 'text-teal-400 font-black text-[15px] drop-shadow-[0_0_6px_rgba(45,212,191,0.7)]';
+                    if (p.type === 'evade') color = 'text-cyan-400 font-black text-[14px] drop-shadow-[0_0_6px_rgba(34,211,238,0.7)]';
+                    return (
+                      <motion.div
+                        key={p.id}
+                        initial={{ y: 35, opacity: 0, scale: 0.6 }}
+                        animate={{ y: -35, opacity: 1, scale: 1.2 }}
+                        exit={{ opacity: 0, y: -60, scale: 0.7 }}
+                        transition={{ duration: 1.0, ease: 'easeOut' }}
+                        className={`${color} absolute font-mono select-none`}
+                      >
+                        {p.text}
+                      </motion.div>
+                    );
+                  })}
+                </AnimatePresence>
+              </div>
+
               <span className="text-[9px] text-emerald-400 font-bold mb-0.5">🦸 헌터 연합군</span>
               
               {/* Player HP */}
@@ -1030,7 +1179,30 @@ export default function DungeonPlay({
             </div>
 
             {/* Monsters Side */}
-            <div className="flex flex-col gap-1.5 p-2 bg-neutral-900/60 border border-rose-950/60 rounded-xl relative overflow-hidden flex-1 justify-center">
+            <div className="flex flex-col gap-1.5 p-2 bg-neutral-900/60 border border-rose-950/60 rounded-xl relative overflow-hidden flex-1 justify-center min-h-[140px]">
+              {/* Floating Combat Popups over Monster panel */}
+              <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center overflow-hidden z-20">
+                <AnimatePresence>
+                  {combatPopups.filter(p => p.side === 'enemy').map(p => {
+                    let color = 'text-amber-400 font-extrabold text-[14px] drop-shadow-[0_0_5px_rgba(245,158,11,0.6)]';
+                    if (p.type === 'critical') color = 'text-orange-500 font-black text-[20px] tracking-tight drop-shadow-[0_0_10px_rgba(249,115,22,0.9)] animate-pulse';
+                    if (p.type === 'damage') color = 'text-white font-extrabold text-[17px] drop-shadow-[0_0_6px_rgba(255,255,255,0.7)]';
+                    return (
+                      <motion.div
+                        key={p.id}
+                        initial={{ y: 35, opacity: 0, scale: 0.6 }}
+                        animate={{ y: -45, opacity: 1, scale: p.type === 'critical' ? 1.4 : 1.1 }}
+                        exit={{ opacity: 0, y: -70, scale: 0.7 }}
+                        transition={{ duration: 1.0, ease: 'easeOut' }}
+                        className={`${color} absolute font-mono select-none`}
+                      >
+                        {p.text}
+                      </motion.div>
+                    );
+                  })}
+                </AnimatePresence>
+              </div>
+
               <div className="absolute top-0.5 right-1.5 flex h-2 w-2">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
@@ -1062,17 +1234,23 @@ export default function DungeonPlay({
             <span className="text-[8.5px] text-amber-500 mb-0.5 border-b border-neutral-800 pb-0.5 font-bold uppercase tracking-widest">▲ 전용 영혼 궤적 정밀 타격 로그</span>
             <div className="flex-1 overflow-y-auto flex flex-col gap-1 pr-1">
               {combatLogs.map((log) => {
-                let colorClass = 'text-neutral-300';
-                if (log.type === 'player') colorClass = 'text-green-300 bg-green-950/20 px-1 border-l border-green-500';
-                if (log.type === 'enemy') colorClass = 'text-red-300 bg-red-950/20 px-1 border-l border-red-500';
-                if (log.type === 'system') colorClass = 'text-yellow-400 font-bold';
-                if (log.type === 'skill') colorClass = 'text-cyan-400 bg-cyan-950/20 px-1 border-l border-cyan-500';
-                if (log.type === 'death') colorClass = 'text-red-500 font-black';
-                if (log.type === 'evade') colorClass = 'text-blue-400 font-bold';
+                let colorClass = 'text-neutral-300 border-neutral-700 bg-neutral-900/40';
+                if (log.type === 'player') colorClass = 'text-emerald-100 bg-emerald-950/20 border-emerald-500/50';
+                if (log.type === 'enemy') colorClass = 'text-rose-100 bg-rose-950/20 border-rose-500/50';
+                if (log.type === 'system') colorClass = 'text-amber-100 bg-amber-950/25 border-amber-500/40';
+                if (log.type === 'skill') colorClass = 'text-violet-100 bg-violet-950/20 border-violet-500/50';
+                if (log.type === 'death') colorClass = 'text-red-300 bg-red-950/40 border-red-700 font-extrabold';
+                if (log.type === 'evade') colorClass = 'text-cyan-100 bg-cyan-950/20 border-cyan-500/45';
+                if (log.type === 'heal') colorClass = 'text-teal-100 bg-teal-950/20 border-teal-500/50';
 
                 return (
-                  <div key={log.id} className={`py-0.5 leading-relaxed break-words rounded ${colorClass}`}>
-                    {log.text}
+                  <div key={log.id} className={`py-1 px-2 leading-relaxed break-words rounded-md border-l-2 ${colorClass} shadow-sm font-sans flex items-start gap-1.5`}>
+                    <span className="shrink-0 font-mono text-[8px] opacity-70 bg-neutral-950/60 px-1 py-0.2 rounded mt-0.5 select-none uppercase tracking-tight">
+                      {log.type === 'player' ? 'ME' : log.type === 'enemy' ? 'MON' : log.type === 'system' ? 'SYS' : log.type === 'skill' ? 'SKL' : log.type === 'heal' ? 'HEAL' : log.type === 'evade' ? 'EVD' : 'ALLY'}
+                    </span>
+                    <div className="flex-1 text-[10px] tracking-wide break-keep leading-relaxed text-zinc-100">
+                      {renderRichBattleLog(log.text, log.type)}
+                    </div>
                   </div>
                 );
               })}

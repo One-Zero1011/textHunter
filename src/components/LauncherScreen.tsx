@@ -70,6 +70,7 @@ interface Scenario {
   isAvailable: boolean;
   bgGradient: string;
   illustEmoji: string;
+  image?: string;
 }
 
 export default function LauncherScreen({
@@ -85,6 +86,11 @@ export default function LauncherScreen({
   const [activeTab, setActiveTab] = useState<TabType>('scenarios');
   const [selectedScenarioIndex, setSelectedScenarioIndex] = useState<number>(0);
   const [purchaseFeedback, setPurchaseFeedback] = useState<string | null>(null);
+  const [showScenarioIntro, setShowScenarioIntro] = useState<boolean>(false);
+
+  React.useEffect(() => {
+    setShowScenarioIntro(false);
+  }, [selectedScenarioIndex]);
   
   // Persist Crystals internally to persist pulls outside separate game wipes
   const [crystals, setCrystals] = useState<number>(() => {
@@ -149,7 +155,8 @@ export default function LauncherScreen({
       badge: '시즌 1 에피소드 오픈',
       isAvailable: true,
       bgGradient: 'from-blue-950/60 via-zinc-900 to-zinc-950',
-      illustEmoji: '⏳'
+      illustEmoji: '⏳',
+      image: '/images/Title/Senario01.png'
     },
     {
       id: 'automata-awakening',
@@ -350,7 +357,7 @@ export default function LauncherScreen({
                 <button 
                   onClick={handleScrollLeft}
                   disabled={selectedScenarioIndex === 0}
-                  className={`absolute left-0 z-20 w-8.5 h-8.5 rounded-full border flex items-center justify-center transition-all bg-zinc-900 cursor-pointer ${
+                  className={`absolute left-1.5 z-20 w-8.5 h-8.5 rounded-full border flex items-center justify-center transition-all bg-zinc-900 cursor-pointer ${
                     selectedScenarioIndex === 0 
                       ? 'border-zinc-800/40 text-zinc-700 opacity-30 cursor-not-allowed' 
                       : 'border-zinc-800 text-zinc-300 hover:bg-zinc-800 hover:border-zinc-700'
@@ -360,7 +367,7 @@ export default function LauncherScreen({
                 </button>
 
                 {/* SCENARIO DETAILED PRESENTATION CARD */}
-                <div className="w-full max-w-md mx-10">
+                <div className="w-full max-w-md mx-auto px-10">
                   <motion.div
                     key={selectedScenarioIndex}
                     initial={{ scale: 0.96, opacity: 0 }}
@@ -372,21 +379,18 @@ export default function LauncherScreen({
                         : 'border-zinc-850 opacity-90'
                     }`}
                   >
-                    {/* Scenario decorative float badge in background */}
-                    <div className="absolute right-[-20px] top-[-20px] text-[100px] select-none opacity-10 filter blur-[1px]">
-                      {scenarios[selectedScenarioIndex].illustEmoji}
-                    </div>
-
                     <div>
                       {/* Top status rail */}
                       <div className="flex justify-between items-center mb-3 relative z-10">
-                        <span className={`text-[10px] font-bold px-2.5 py-1 rounded-md font-mono ${
-                          scenarios[selectedScenarioIndex].isAvailable 
-                            ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' 
-                            : 'bg-zinc-850 text-zinc-500 border border-zinc-800'
-                        }`}>
-                          {scenarios[selectedScenarioIndex].badge}
-                        </span>
+                        {scenarios[selectedScenarioIndex].badge && scenarios[selectedScenarioIndex].badge !== '시즌 1 에피소드 오픈' && (
+                          <span className={`text-[10px] font-bold px-2.5 py-1 rounded-md font-mono ${
+                            scenarios[selectedScenarioIndex].isAvailable 
+                              ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' 
+                              : 'bg-zinc-850 text-zinc-500 border border-zinc-800'
+                          }`}>
+                            {scenarios[selectedScenarioIndex].badge}
+                          </span>
+                        )}
                       </div>
 
                       {/* Main Titles */}
@@ -397,31 +401,70 @@ export default function LauncherScreen({
                             <Sparkles className="w-4 h-4 text-blue-400 animate-pulse" />
                           )}
                         </h3>
-                        <p className="text-xs text-blue-400 font-medium font-mono mt-0.5">
-                          {scenarios[selectedScenarioIndex].tagline}
-                        </p>
                       </div>
 
-                      {/* Narratives details */}
-                      <p className="text-xs text-zinc-400 leading-relaxed font-sans mt-4 break-keep line-clamp-4 relative z-10 font-medium">
-                        {scenarios[selectedScenarioIndex].description}
-                      </p>
+                      {showScenarioIntro ? (
+                        /* When "새로 시작" / "연대기 진입" is pressed, show description details and play button */
+                        <div className="mt-4 p-4 rounded-xl bg-zinc-950/70 border border-zinc-850/50 relative z-10 animate-fadeIn flex flex-col gap-2">
+                          <p className="text-[10px] text-zinc-500 font-mono font-bold uppercase tracking-widest mb-1 shadow-sm flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
+                            시나리오 해설 및 사건 개요 (Scenario Data)
+                          </p>
+                          <p className="text-xs text-blue-400 font-extrabold font-mono text-[11px] leading-relaxed">
+                            {scenarios[selectedScenarioIndex].tagline}
+                          </p>
+                          <p className="text-xs text-zinc-300 leading-relaxed font-sans break-keep font-medium mt-1">
+                            {scenarios[selectedScenarioIndex].description}
+                          </p>
+                        </div>
+                      ) : (
+                        /* Initially, only show the beautiful scenario cover image banner */
+                        scenarios[selectedScenarioIndex].image && (
+                          <div className="mt-4 relative z-10 rounded-xl overflow-hidden border border-zinc-800/80 shadow-md aspect-[3/4] max-h-[420px] md:max-h-[460px] bg-zinc-950 shrink-0 animate-fadeIn flex items-center justify-center">
+                            <img 
+                              src={scenarios[selectedScenarioIndex].image} 
+                              alt={scenarios[selectedScenarioIndex].title}
+                              referrerPolicy="no-referrer"
+                              className="w-full h-full object-contain transition-transform duration-500 hover:scale-[1.02]"
+                            />
+                            <div className="absolute inset-0 bg-gradient-to-t from-zinc-950/20 via-transparent to-transparent pointer-events-none" />
+                          </div>
+                        )
+                      )}
                     </div>
 
                     {/* Footer values and action buttons */}
                     <div className="flex justify-end items-center border-t border-zinc-800/60 pt-3 mt-1 relative z-10 gap-2">
                       {scenarios[selectedScenarioIndex].isAvailable ? (
-                        scenarios[selectedScenarioIndex].id === 'f-hunter' && hasSave ? (
+                        showScenarioIntro ? (
+                          /* If showing description, display Cancel & Confirm Game Button */
                           <>
                             <button
+                              onClick={() => setShowScenarioIntro(false)}
+                              className="bg-zinc-850 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 px-3 py-2 text-xs font-bold rounded-lg cursor-pointer flex items-center gap-1 transition-all font-sans border border-zinc-800"
+                            >
+                              <span>이전으로</span>
+                            </button>
+                            <button
                               onClick={() => {
-                                const confirmNew = window.confirm(
-                                  "⚠️ 경고! 이미 기존에 저장된 'F급 헌터 연대기' 진행 상황이 존재합니다.\n\n새로 시작하시면 현재까지 성장한 플레이어 스탯 및 던전 진행도가 전부 초기화됩니다. 정말로 '새 출발(새로 시작)'하시겠습니까?"
-                                );
-                                if (confirmNew) {
-                                  handleEnterChronicle();
+                                if (hasSave) {
+                                  const confirmNew = window.confirm(
+                                    "⚠️ 경고! 이미 기존에 저장된 'F급 헌터 연대기' 진행 상황이 존재합니다.\n\n새로 시작하시면 현재까지 성장한 플레이어 스탯 및 던전 진행도가 전부 초기화됩니다. 정말로 '새 출발(새로 시작)'하시겠습니까?"
+                                  );
+                                  if (!confirmNew) return;
                                 }
+                                handleEnterChronicle();
                               }}
+                              className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white px-4 py-2 text-xs font-black rounded-lg cursor-pointer flex items-center gap-1.5 hover:scale-105 active:scale-95 transition-all shadow-lg font-sans"
+                            >
+                              <Gamepad2 className="w-3.5 h-3.5" />
+                              <span>시작하기</span>
+                            </button>
+                          </>
+                        ) : scenarios[selectedScenarioIndex].id === 'f-hunter' && hasSave ? (
+                          <>
+                            <button
+                              onClick={() => setShowScenarioIntro(true)}
                               className="bg-zinc-850 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 px-3 py-2 text-xs font-bold rounded-lg cursor-pointer flex items-center gap-1 transition-all font-sans border border-zinc-800"
                             >
                               <RotateCcw className="w-3.5 h-3.5" />
@@ -431,13 +474,13 @@ export default function LauncherScreen({
                               onClick={onContinueGame}
                               className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white px-4 py-2 text-xs font-black rounded-lg cursor-pointer flex items-center gap-1.5 hover:scale-105 active:scale-95 transition-all shadow-lg shadow-emerald-950/40 font-sans animate-pulse"
                             >
-                              <Gamepad2 className="w-3.5 h-3.5" />
+                              <Gamepad2 className="w-3.5 h-3.5 animate-pulse" />
                               <span>이어하기 (계속)</span>
                             </button>
                           </>
                         ) : (
                           <button
-                            onClick={handleEnterChronicle}
+                            onClick={() => setShowScenarioIntro(true)}
                             className="bg-zinc-100 hover:bg-white text-zinc-950 px-4 py-2 text-xs font-bold rounded-lg cursor-pointer flex items-center gap-1 hover:scale-105 active:scale-95 transition-all shadow-md font-sans"
                           >
                             <Gamepad2 className="w-3.5 h-3.5" />
@@ -457,7 +500,7 @@ export default function LauncherScreen({
                 <button 
                   onClick={handleScrollRight}
                   disabled={selectedScenarioIndex === scenarios.length - 1}
-                  className={`absolute right-0 z-20 w-8.5 h-8.5 rounded-full border flex items-center justify-center transition-all bg-zinc-900 cursor-pointer ${
+                  className={`absolute right-1.5 z-20 w-8.5 h-8.5 rounded-full border flex items-center justify-center transition-all bg-zinc-900 cursor-pointer ${
                     selectedScenarioIndex === scenarios.length - 1 
                       ? 'border-zinc-800/40 text-zinc-700 opacity-30 cursor-not-allowed' 
                       : 'border-zinc-800 text-zinc-300 hover:bg-zinc-800 hover:border-zinc-700'
