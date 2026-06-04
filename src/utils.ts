@@ -8,7 +8,7 @@ export function getAssetPath(relativePath: string): string {
   
   // Use Vite's built-in BASE_URL which is statically replaced correctly during build.
   // This automatically uses the value of `base` we configured in vite.config.ts.
-  const baseUrl = import.meta.env.BASE_URL;
+  const baseUrl = (import.meta as any).env?.BASE_URL;
   
   if (baseUrl) {
     if (baseUrl.endsWith('/')) {

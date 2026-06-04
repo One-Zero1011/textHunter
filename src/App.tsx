@@ -19,6 +19,7 @@ import MainMenu from './components/MainMenu';
 import LauncherScreen from './components/LauncherScreen';
 import EndingScreen from './components/EndingScreen';
 import SettingsModal from './components/SettingsModal';
+import TutorialOverlay from './components/TutorialOverlay';
 import { getActiveStoryForNpc } from './data/chatStories';
 import { 
   Smartphone, Award, Heart, HelpCircle, Shield, Sparkles, 
@@ -78,6 +79,7 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState<boolean>(false);
   const [equippedTitleId, setEquippedTitleId] = useState<string | null>(null);
   const [endingType, setEndingType] = useState<'dead' | 'world_destroyed' | 'normal' | 'happy' | null>(null);
+  const [showTutorial, setShowTutorial] = useState<boolean>(false);
 
   // Calculate dynamic effective stats by adding active equipped title rewards and equipped armor/weapons on the fly
   const getEffectiveStats = (): CharacterStats => {
@@ -571,7 +573,13 @@ export default function App() {
         {gameStarted && introActive && (
           <GameIntro 
             loopCount={loopCount} 
-            onStartGame={() => setIntroActive(false)} 
+            onStartGame={() => {
+              setIntroActive(false);
+              const isComp = localStorage.getItem('hunter_f_tutorial_completed') === 'true';
+              if (loopCount === 1 && !isComp) {
+                setShowTutorial(true);
+              }
+            }} 
           />
         )}
 
@@ -807,6 +815,15 @@ export default function App() {
               })}
             </div>
 
+            {/* Tutorial Help trigger */}
+            <button 
+              onClick={() => setShowTutorial(true)}
+              className="text-zinc-500 hover:text-cyan-450 transition-colors p-1.5 cursor-pointer bg-zinc-950/40 hover:bg-zinc-800 border border-zinc-800/60 rounded-lg mr-1.5 flex items-center justify-center"
+              title="인과 가이드 튜토리얼 열기"
+            >
+              <HelpCircle className="w-4 h-4 text-cyan-500/85 hover:text-cyan-400" />
+            </button>
+
             {/* Settings trigger */}
             <button 
               onClick={() => setSettingsOpen(!settingsOpen)}
@@ -945,6 +962,15 @@ export default function App() {
                 </button>
               </motion.div>
             </div>
+          )}
+        </AnimatePresence>
+
+        {/* TUTORIAL OVERLAY GUIDE */}
+        <AnimatePresence>
+          {showTutorial && (
+            <TutorialOverlay 
+              onClose={() => setShowTutorial(false)}
+            />
           )}
         </AnimatePresence>
 
