@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { generateNonLinearDungeonMap } from '../data/dungeonGenerator';
+import { soundManager } from '../utils/soundManager';
 
 interface DungeonPlayProps {
   dungeon: Dungeon;
@@ -83,10 +84,32 @@ export default function DungeonPlay({
 
   // Combat Floating Popups
   const [combatPopups, setCombatPopups] = useState<{ id: string; text: string; side: 'player' | 'enemy'; type: 'damage' | 'heal' | 'evade' | 'critical' }[]>([]);
+  const [activeVisualEffect, setActiveVisualEffect] = useState<'slash' | 'spell' | 'heal' | 'electric' | 'crit' | 'enemy-hit' | null>(null);
+  const [shakeActive, setShakeActive] = useState<boolean>(false);
+
+  const triggerVisualEffect = (type: 'slash' | 'spell' | 'heal' | 'electric' | 'crit' | 'enemy-hit') => {
+    setActiveVisualEffect(type);
+    if (type === 'slash' || type === 'crit' || type === 'enemy-hit') {
+      setShakeActive(true);
+      setTimeout(() => setShakeActive(false), 350);
+    }
+    setTimeout(() => {
+      setActiveVisualEffect(null);
+    }, 600);
+  };
 
   const triggerCombatPopup = (text: string, side: 'player' | 'enemy', type: 'damage' | 'heal' | 'evade' | 'critical') => {
     const id = Math.random().toString();
     setCombatPopups(prev => [...prev, { id, text, side, type }]);
+    
+    if (type === 'damage' || type === 'critical') {
+      soundManager.playSfx('hit');
+    } else if (type === 'heal') {
+      soundManager.playSfx('heal');
+    } else if (type === 'evade') {
+      soundManager.playSfx('click');
+    }
+
     setTimeout(() => {
       setCombatPopups(prev => prev.filter(p => p.id !== id));
     }, 1200);
@@ -411,11 +434,26 @@ export default function DungeonPlay({
       if (damage > 0) {
         const isCrit = (skillId === 'skill_summon_dragon' || skillId === 'skill_hunter_execution' || skillId === 'skill_summon_shadow');
         triggerCombatPopup(`-${damage}`, 'enemy', isCrit ? 'critical' : 'damage');
+        
+        // Trigger high-fidelity visual effects
+        if (skillId === 'skill_summon_dragon' || skillId === 'skill_hunter_execution') {
+          triggerVisualEffect('crit');
+        } else if (skillId === 'skill_magic_thunder') {
+          triggerVisualEffect('electric');
+        } else if (skillId === 'skill_magic_fire' || skillId === 'skill_summon_shadow' || skillId === 'skill_summon_golem') {
+          triggerVisualEffect('spell');
+        } else if (skillId === 'skill_hunter_dash') {
+          triggerVisualEffect('slash');
+        } else {
+          triggerVisualEffect('slash');
+        }
       }
       if (skillId === 'skill_magic_restoration') {
         triggerCombatPopup(`+35 HP (All)`, 'player', 'heal');
+        triggerVisualEffect('heal');
       } else if (skillId === 'skill_hunter_shield' || skillId === 'skill_summon_golem') {
         triggerCombatPopup(`🛡️ BARRIER`, 'player', 'heal');
+        triggerVisualEffect('heal');
       }
       
       if (nextHp <= 0) {
@@ -474,8 +512,13 @@ export default function DungeonPlay({
       addBattleLog(`⚔️ 주사위 🎲 [${actualRoll}] 굴림! 적에게 ${damage}의 데미지를 가했습니다!`, 'player');
       setIsRolling(false);
 
-      // Trigger combat popup for normal attacks
+      // Trigger combat popup for normal attacks and visual effects
       triggerCombatPopup(`-${damage}`, 'enemy', actualRoll >= 18 ? 'critical' : 'damage');
+      if (actualRoll >= 18) {
+        triggerVisualEffect('crit');
+      } else {
+        triggerVisualEffect('slash');
+      }
 
       if (nextHp <= 0) {
         setTimeout(() => {
@@ -498,7 +541,7 @@ export default function DungeonPlay({
     setTimeout(() => {
       let dmg = 0;
       
-      // NPC action based on entity
+      // NPC action based on entity and trigger visual effects
       if (allyId === 'baek') {
         const isBaekJoined = activeAllies.some(a => a.id === 'baek');
         if (isBaekJoined && !baekSkillUsed && Math.random() < 0.6) {
@@ -506,30 +549,37 @@ export default function DungeonPlay({
           setBaekSkillUsed(true);
           addBattleLog(`🛡️ 백운혁이 거대한 방패를 다잡으며 전설적 클래스 [희생의 방패] 오라를 시전합니다! (나머지 턴 동안 위기 차단)`, 'skill');
           triggerCombatPopup(`🛡️ BARRIER`, 'player', 'heal');
+          triggerVisualEffect('heal');
         } else {
           dmg = 25 + stats.intellect; // shield bash
           addBattleLog(`🛡️ 백운혁의 방패 치기! 적을 넉백시키고 ${dmg}의 데미지를 부여했습니다.`, 'ally');
           triggerCombatPopup(`-${dmg}`, 'enemy', 'damage');
+          triggerVisualEffect('slash');
         }
       } else if (allyId === 'geum') {
         dmg = 45 + Math.floor(stats.health * 0.4);
         addBattleLog(`⚡ 금채란이 공중에 수십 발의 황금 마석 탄환을 발포해 ${dmg}의 폭발 데미지를 뿜었습니다!`, 'ally');
         triggerCombatPopup(`-${dmg}`, 'enemy', 'critical');
+        triggerVisualEffect('crit');
       } else if (allyId === 'lim') {
         addBattleLog(`📖 임소연이 가죽 고서의 인과율을 복제하여 파티 공격력을 보정합니다. (모든 주사위 크리티컬 보정)`, 'ally');
         triggerCombatPopup(`📖 OPTIMIZE`, 'player', 'heal');
+        triggerVisualEffect('spell');
       } else if (allyId === 'kang') {
         dmg = 40 + Math.floor(stats.agility * 0.3) + Math.floor(stats.health * 0.2);
         addBattleLog(`🎯 B급 스나이퍼 강다인이 저격 라이플로 적의 심장을 관통하는 사격을 감행해 ${dmg}의 관통 데미지를 입혔습니다!`, 'ally');
         triggerCombatPopup(`-${dmg}`, 'enemy', 'critical');
+        triggerVisualEffect('crit');
       } else if (allyId === 'yoo') {
         dmg = 28 + Math.floor(stats.intellect * 0.3);
         addBattleLog(`🧭 C급 탐측사 유채은이 굴절 유도 마나 공간 파동탄을 쏘아 적의 밸런스를 흩뜨리며 ${dmg}의 정밀 치명 데미지를 가했습니다!`, 'ally');
         triggerCombatPopup(`-${dmg}`, 'enemy', 'damage');
+        triggerVisualEffect('spell');
       } else if (allyId === 'choi') {
         dmg = 35 + Math.floor(stats.strength * 0.4);
         addBattleLog(`🪓 D급 강습 전투원 최강식이 고함을 지르며 거대한 공격 도끼를 휘둘러 ${dmg}의 타격 데미지를 입혔습니다!`, 'ally');
         triggerCombatPopup(`-${dmg}`, 'enemy', 'damage');
+        triggerVisualEffect('slash');
       } else if (allyId === 'park') {
         dmg = 12 + Math.floor(stats.intellect * 0.1);
         setBodyPartsHP(prev => {
@@ -547,11 +597,16 @@ export default function DungeonPlay({
         addBattleLog(`🧪 E급 보조 의료원 박소록이 [진통 영양제]를 주사했습니다! 가장 치명적인 부위를 보완해 +20 HP를 치유했습니다!`, 'heal');
         addBattleLog(`🧪 박소록이 날카로운 주사 바늘과 메스로 엄호 사격해 ${dmg}의 데미지를 보충했습니다.`, 'ally');
         triggerCombatPopup(`+20 HP`, 'player', 'heal');
-        setTimeout(() => triggerCombatPopup(`-${dmg}`, 'enemy', 'damage'), 400);
+        triggerVisualEffect('heal');
+        setTimeout(() => {
+          triggerCombatPopup(`-${dmg}`, 'enemy', 'damage');
+          triggerVisualEffect('slash');
+        }, 400);
       } else if (allyId === 'shin') {
         dmg = 10 + Math.floor(stats.strength * 0.1);
         addBattleLog(`📦 F급 신현민이 뒤쪽에서 골동품 수집 고압 마정 수류탄 보따리를 마구 투사해 ${dmg}의 화력 폭발 데미지를 흩뿌렸습니다!`, 'ally');
         triggerCombatPopup(`-${dmg}`, 'enemy', 'damage');
+        triggerVisualEffect('spell');
       }
       
       if (dmg > 0) {
@@ -568,6 +623,7 @@ export default function DungeonPlay({
       nextTurn();
     }, 1000);
   };
+
 
   // Monster Turn Action
   const executeEnemyTurn = () => {
@@ -636,6 +692,7 @@ export default function DungeonPlay({
 
       addBattleLog(`💥 몬스터가 당신의 [${partLabel}]를 난폭하게 격타해 ${netDmg}의 아픔을 주었습니다. (부위 HP: ${nextHP}/100)`, 'enemy');
       triggerCombatPopup(`-${netDmg} HP`, 'player', 'damage');
+      triggerVisualEffect('enemy-hit');
 
       // Critical conditions checked directly outside of state updater
       if ((targetedPart === 'head' || targetedPart === 'torso') && nextHP <= 0) {
@@ -816,7 +873,9 @@ export default function DungeonPlay({
   const currentTurnEntity = initiativeOrder[currentTurnIdx];
 
   return (
-    <div className="absolute inset-0 z-30 bg-neutral-950 text-white flex flex-col overflow-hidden text-xs">
+    <div className={`absolute inset-0 z-30 bg-neutral-950 text-white flex flex-col overflow-hidden text-xs md:text-sm lg:text-base transition-all duration-300 ${
+      shakeActive ? 'animate-shake' : ''
+    }`}>
       
       {/* HEADER BAR */}
       <div className="p-3 bg-neutral-900 border-b border-neutral-800 flex justify-between items-center shrink-0">
@@ -1115,8 +1174,78 @@ export default function DungeonPlay({
         </div>
       ) : (
         /* ================== ACTIVE RPG combat BOARD ================== */
-        <div className="flex flex-col flex-1 overflow-hidden p-3 gap-2 bg-neutral-950">
+        <div className="relative flex flex-col flex-1 overflow-hidden p-3 gap-2 bg-neutral-950">
           
+          {/* VISUAL EFFECTS OVERLAYS */}
+          <AnimatePresence>
+            {activeVisualEffect && (
+              <div className="absolute inset-0 z-40 pointer-events-none flex items-center justify-center overflow-hidden">
+                {activeVisualEffect === 'slash' && (
+                  <div className="relative w-full h-full">
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[240px] md:w-[350px] h-3 md:h-4 bg-gradient-to-r from-transparent via-cyan-400 to-transparent shadow-[0_0_15px_rgba(34,211,238,0.85)] animate-neon-slash" />
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[280px] md:w-[400px] h-1.5 bg-white shadow-[0_0_10px_rgba(255,255,255,1)] animate-neon-slash [animation-delay:0.05s]" />
+                    <div className="absolute top-1/2 left-1/2 w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
+                  </div>
+                )}
+                {activeVisualEffect === 'spell' && (
+                  <div className="w-48 h-48 md:w-64 md:h-64 rounded-full bg-violet-600/25 border-2 border-violet-400/40 shadow-[0_0_40px_rgba(139,92,246,0.6)] animate-spell-burst flex items-center justify-center">
+                    <div className="w-16 h-16 md:w-24 md:h-24 rounded-full bg-indigo-500/30 border border-indigo-300 blur-sm" />
+                  </div>
+                )}
+                {activeVisualEffect === 'electric' && (
+                  <div className="relative w-full h-full flex items-center justify-center">
+                    <div className="absolute w-32 h-32 md:w-48 md:h-48 border border-cyan-400/30 rounded-full animate-pulse flex items-center justify-center">
+                      {[0, 60, 120, 180, 240, 300].map((angle, k) => (
+                        <div 
+                          key={k}
+                          className="absolute w-5 h-5 text-[15px] md:text-[18px] text-cyan-400 animate-electric-spark flex items-center justify-center"
+                          style={{
+                            top: `calc(50% + ${Math.sin(angle * Math.PI / 180) * 50}px)`,
+                            left: `calc(50% + ${Math.cos(angle * Math.PI / 180) * 50}px)`,
+                            animationDelay: `${k * 0.05}s`
+                          }}
+                        >
+                          ⚡
+                        </div>
+                      ))}
+                    </div>
+                    <div className="absolute w-12 h-12 rounded-full bg-cyan-500/10 border border-cyan-400 blur-md animate-ping" />
+                  </div>
+                )}
+                {activeVisualEffect === 'heal' && (
+                  <div className="relative w-full h-full flex items-center justify-center">
+                    {[1, 2, 3, 4, 5, 6].map((idx) => (
+                      <div 
+                        key={idx}
+                        className="absolute font-bold text-amber-300 text-lg md:text-xl animate-heal-rise"
+                        style={{
+                          left: `${35 + idx * 10}%`,
+                          top: `${40 + (idx % 2) * 15}%`,
+                          animationDelay: `${idx * 0.08}s`
+                        }}
+                      >
+                        ✨
+                      </div>
+                    ))}
+                    <div className="absolute w-24 h-24 md:w-36 md:h-36 rounded-full bg-emerald-500/10 border border-emerald-400/40 shadow-[0_0_25px_rgba(52,211,153,0.35)] animate-spell-burst" />
+                  </div>
+                )}
+                {activeVisualEffect === 'crit' && (
+                  <div className="relative w-full h-full flex items-center justify-center bg-rose-950/15">
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-8 bg-gradient-to-r from-transparent via-orange-500 to-transparent animate-neon-slash rotate-45" />
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-8 bg-gradient-to-r from-transparent via-red-600 to-transparent animate-neon-slash -rotate-45" />
+                    <div className="absolute text-orange-400 font-black text-xl md:text-2xl uppercase tracking-widest font-display animate-pulse drop-shadow-[0_0_15px_rgba(239,68,68,0.9)] bg-neutral-950/90 py-1.5 px-6 rounded-xl border-2 border-orange-500">
+                      CRITICAL IMPACT
+                    </div>
+                  </div>
+                )}
+                {activeVisualEffect === 'enemy-hit' && (
+                  <div className="absolute inset-0 animate-hit-vignette pointer-events-none z-50 rounded-2xl" />
+                )}
+              </div>
+            )}
+          </AnimatePresence>
+
           {/* TURN COUNTER & TEAM INDICATOR */}
           <div className="flex justify-between items-center bg-neutral-900 border border-neutral-800 px-3 py-1.5 rounded-lg text-[10px]">
             <span className="font-mono text-emerald-400 font-bold">TURN {turn}</span>

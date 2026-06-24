@@ -40,6 +40,21 @@ interface PhoneModalProps {
   onEquipTitle: (titleId: string | null) => void;
 }
 
+const getPortraitPath = (id: string): string => {
+  const mapping: Record<string, string> = {
+    lim: 'imsoyeon',
+    baek: 'baek',
+    geum: 'geum',
+    kang: 'kang',
+    yoo: 'yoo',
+    choi: 'choi',
+    park: 'park',
+    shin: 'shin',
+  };
+  const folder = mapping[id] || id;
+  return getAssetPath(`images/portraits/${folder}/basic.png`);
+};
+
 export type TabType = 'status' | 'npc' | 'chat' | 'dungeon' | 'inventory' | 'records';
 
 export default function PhoneModal({
@@ -951,11 +966,7 @@ export default function PhoneModal({
                       >
                         <div className="flex gap-3 items-center">
                           <div className="w-12 h-12 rounded-xl bg-zinc-950 border border-zinc-850 flex items-center justify-center text-xl shadow-inner overflow-hidden">
-                            {npc.id === 'lim' ? (
-                              <img src={getAssetPath("images/portraits/imsoyeon/basic.png")} alt={npc.name} referrerPolicy="no-referrer" className="w-full h-full object-cover object-top" />
-                            ) : (
-                              npc.avatarUrl
-                            )}
+                            <img src={getPortraitPath(npc.id)} alt={npc.name} referrerPolicy="no-referrer" className="w-full h-full object-cover object-top" />
                           </div>
                           <div>
                             <div className="flex items-center gap-2">
@@ -997,13 +1008,9 @@ export default function PhoneModal({
 
                       <div className="p-4 bg-zinc-900 border border-zinc-800 rounded-2xl relative shadow-lg">
                         <div className="flex justify-center mb-3">
-                          {npc.id === 'lim' ? (
-                            <div className="w-24 h-24 rounded-2xl bg-zinc-950 border border-zinc-855 shadow-md overflow-hidden relative">
-                              <img src={getAssetPath("images/portraits/imsoyeon/basic.png")} alt={npc.name} referrerPolicy="no-referrer" className="w-full h-full object-cover object-top" />
-                            </div>
-                          ) : (
-                            <div className="text-4xl text-center mb-1">{npc.avatarUrl}</div>
-                          )}
+                          <div className="w-24 h-24 rounded-2xl bg-zinc-950 border border-zinc-850 shadow-md overflow-hidden relative">
+                            <img src={getPortraitPath(npc.id)} alt={npc.name} referrerPolicy="no-referrer" className="w-full h-full object-cover object-top" />
+                          </div>
                         </div>
                         <h4 className="text-base font-bold text-center text-zinc-100 font-display">{npc.name}</h4>
                         <div className="text-xs text-zinc-500 text-center font-mono mt-0.5 font-bold uppercase tracking-widest">{npc.rank} DETECTED</div>
@@ -1091,12 +1098,8 @@ export default function PhoneModal({
                           }`}
                         >
                           <div className="flex gap-3 items-center flex-1 min-w-0">
-                            <div className="w-10 h-10 rounded-xl bg-zinc-950 border border-zinc-850 flex items-center justify-center text-base shadow-inner relative overflow-hidden">
-                              {npc.id === 'lim' ? (
-                                <img src={getAssetPath("images/portraits/imsoyeon/basic.png")} alt={npc.name} referrerPolicy="no-referrer" className="w-full h-full object-cover object-top" />
-                              ) : (
-                                npc.avatarUrl
-                              )}
+                            <div className="w-10 h-10 rounded-xl bg-zinc-950 border border-zinc-851 flex items-center justify-center text-base shadow-inner relative overflow-hidden">
+                              <img src={getPortraitPath(npc.id)} alt={npc.name} referrerPolicy="no-referrer" className="w-full h-full object-cover object-top" />
                               {isPending && (
                                 <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-rose-500 animate-bounce border border-zinc-900 z-10" />
                               )}

@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { getAssetPath } from '../utils';
+import { soundManager } from '../utils/soundManager';
 import { 
   TRAINING_ACTIVITIES, 
   RECOVERY_ACTIVITIES, 
@@ -41,6 +42,91 @@ interface LocationSceneProps {
   inventory: Equipment[];
   setInventory: React.Dispatch<React.SetStateAction<Equipment[]>>;
 }
+
+const getPortraitPath = (id: string): string => {
+  const mapping: Record<string, string> = {
+    lim: 'imsoyeon',
+    baek: 'baek',
+    geum: 'geum',
+    kang: 'kang',
+    yoo: 'yoo',
+    choi: 'choi',
+    park: 'park',
+    shin: 'shin',
+  };
+  const folder = mapping[id] || id;
+  return getAssetPath(`images/portraits/${folder}/basic.png`);
+};
+
+interface PortraitStyle {
+  border: string;
+  glowBg: string;
+  tagGrad: string;
+  textAccent: string;
+  subRole: string;
+}
+
+const getPortraitStyle = (npcId: string): PortraitStyle => {
+  const styles: Record<string, PortraitStyle> = {
+    baek: {
+      border: 'border-blue-500/30',
+      glowBg: 'bg-blue-600/10',
+      tagGrad: 'from-blue-600 to-sky-600',
+      textAccent: 'text-blue-400',
+      subRole: 'STEEL_FORTRESS',
+    },
+    geum: {
+      border: 'border-amber-500/30',
+      glowBg: 'bg-amber-600/10',
+      tagGrad: 'from-amber-600 to-yellow-500',
+      textAccent: 'text-amber-400',
+      subRole: 'GOLDEN_REGENT',
+    },
+    lim: {
+      border: 'border-emerald-500/30',
+      glowBg: 'bg-emerald-600/10',
+      tagGrad: 'from-emerald-600 to-teal-600',
+      textAccent: 'text-emerald-400',
+      subRole: 'RECORD_ARCHIVER',
+    },
+    kang: {
+      border: 'border-violet-500/30',
+      glowBg: 'bg-violet-600/10',
+      tagGrad: 'from-violet-600 to-fuchsia-600',
+      textAccent: 'text-violet-400',
+      subRole: 'DIMENSION_SNIPER',
+    },
+    yoo: {
+      border: 'border-purple-500/30',
+      glowBg: 'bg-purple-600/10',
+      tagGrad: 'from-purple-600 to-pink-600',
+      textAccent: 'text-purple-400',
+      subRole: 'SPATIAL_DETECTOR',
+    },
+    choi: {
+      border: 'border-red-500/30',
+      glowBg: 'bg-red-600/10',
+      tagGrad: 'from-red-600 to-orange-600',
+      textAccent: 'text-red-400',
+      subRole: 'STEEL_STRIKER',
+    },
+    park: {
+      border: 'border-sky-500/30',
+      glowBg: 'bg-sky-600/10',
+      tagGrad: 'from-sky-600 to-cyan-500',
+      textAccent: 'text-sky-400',
+      subRole: 'HOLY_ALCHEMIST',
+    },
+    shin: {
+      border: 'border-zinc-500/30',
+      glowBg: 'bg-zinc-600/10',
+      tagGrad: 'from-zinc-600 to-neutral-500',
+      textAccent: 'text-zinc-400',
+      subRole: 'GATE_BOOST_VENDOR',
+    },
+  };
+  return styles[npcId] || styles.lim;
+};
 
 type DestinationType = 'training' | 'recovery' | 'job' | 'store' | 'home';
 
@@ -491,6 +577,7 @@ export default function LocationScene({
   };
 
   const handleChoiceSelect = (choice: NpcChoice) => {
+    soundManager.playSfx('click');
     // Modify rapport values
     setNpcs(prev => prev.map(n => {
       if (n.id === activeNpcEvent?.npc.id) {
@@ -546,6 +633,7 @@ export default function LocationScene({
     const jobAct = JOB_ACTIVITIES.find(a => a.id === type);
 
     if (trainingAct) {
+      soundManager.playSfx('levelup');
       setStats(prev => ({
         ...prev,
         strength: prev.strength + (trainingAct.statBonus.strength || 0),
@@ -556,6 +644,7 @@ export default function LocationScene({
       setFatigue(prev => Math.max(0, prev - trainingAct.fatigueCost));
       msg = `${trainingAct.message.replace('(+15 피로도)', '(-15 피로도)')}`;
     } else if (recoveryAct) {
+      soundManager.playSfx('heal');
       setFatigue(prev => Math.min(100, prev + recoveryAct.fatigueReduction));
       // Heal all body parts HP to full
       setBodyPartsHP({
@@ -563,6 +652,7 @@ export default function LocationScene({
       });
       msg = `${recoveryAct.message.replace('피로도가 -45 크게 회복', '피로도가 +45 크게 회복')}`;
     } else if (jobAct) {
+      soundManager.playSfx('click');
       const pay = jobAct.calculateGoldReward(stats);
       setGold(prev => prev + pay);
       setFatigue(prev => Math.max(0, prev - jobAct.fatigueCost));
@@ -664,16 +754,18 @@ export default function LocationScene({
       </div>
 
       {/* ACTIVE EVENTS OR INTERACTIVE CHOICE BLOCK */}
-      {activeNpcEvent ? (
-        activeNpcEvent.npc.id === 'lim' ? (
+      {activeNpcEvent ? (() => {
+        const pStyle = getPortraitStyle(activeNpcEvent.npc.id);
+        const pPath = getPortraitPath(activeNpcEvent.npc.id);
+        return (
           /* =======================================================
-             🌌 IM SOYEON PORTRAIT VISUAL NOVEL DIALOGUE (임소연 미연시 연출)
+             🌌 DYNAMIC NPC PORTRAIT VISUAL NOVEL DIALOGUE (인연 공정 미연시 연출)
              ======================================================= */
-          <div className="p-0 bg-zinc-950 border border-violet-500/30 rounded-2xl flex flex-col md:flex-row overflow-hidden relative shadow-2xl min-h-[440px] md:min-h-[380px] animate-fadeIn transition-all duration-300">
+          <div className={`p-0 bg-zinc-950 border ${pStyle.border} rounded-2xl flex flex-col md:flex-row overflow-hidden relative shadow-2xl min-h-[440px] md:min-h-[380px] animate-fadeIn transition-all duration-300`}>
             
             {/* Ambient Background Grid & Neon Blur */}
             <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px] pointer-events-none" />
-            <div className="absolute top-10 right-10 w-48 h-48 bg-violet-600/10 rounded-full blur-3xl pointer-events-none" />
+            <div className={`absolute top-10 right-10 w-48 h-48 ${pStyle.glowBg} rounded-full blur-3xl pointer-events-none`} />
             <div className="absolute bottom-10 left-10 w-48 h-48 bg-blue-600/10 rounded-full blur-3xl pointer-events-none" />
 
             {/* Left/Sidebar: Gorgeous Portrait Art */}
@@ -682,8 +774,8 @@ export default function LocationScene({
               <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-4/5 h-4/5 bg-gradient-to-tr from-violet-500/10 to-blue-500/10 rounded-full blur-3xl" />
               
               <img
-                src={getAssetPath("images/portraits/imsoyeon/basic.png")}
-                alt="임소연 미연시 초상화"
+                src={pPath}
+                alt={`${activeNpcEvent.npc.name} 미연시 초상화`}
                 referrerPolicy="no-referrer"
                 className="w-full h-full max-h-[320px] md:max-h-[380px] object-contain object-bottom z-10 select-none pointer-events-none drop-shadow-[0_8px_32px_rgba(139,92,246,0.25)] transition-transform duration-700 hover:scale-[1.025]"
               />
@@ -691,8 +783,8 @@ export default function LocationScene({
               {/* NPC Metadata floating info overlay */}
               <div className="absolute top-3 left-3 z-10 bg-zinc-950/80 backdrop-blur-md border border-zinc-805 px-3 py-1.5 rounded-xl flex items-center gap-1.5 shadow-md">
                 <span className="w-1.5 h-1.5 rounded-full bg-violet-500 animate-pulse" />
-                <span className="text-[10px] text-violet-400 font-mono font-bold tracking-widest uppercase">
-                  RECORD_ARCHIVER
+                <span className={`text-[10px] ${pStyle.textAccent} font-mono font-bold tracking-widest uppercase`}>
+                  {pStyle.subRole}
                 </span>
               </div>
             </div>
@@ -704,18 +796,18 @@ export default function LocationScene({
               <div className="flex flex-col gap-2.5">
                 {/* Character Speaker Tag Panel */}
                 <div className="flex items-center gap-2">
-                  <div className="px-3.5 py-1 bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-extrabold text-xs tracking-wider rounded-lg shadow-[0_2px_8px_rgba(139,92,246,0.3)] font-sans flex items-center gap-1.5">
+                  <div className={`px-3.5 py-1 bg-gradient-to-r ${pStyle.tagGrad} text-white font-extrabold text-xs tracking-wider rounded-lg shadow-md font-sans flex items-center gap-1.5`}>
                     <span>✨ {activeNpcEvent.npc.name}</span>
                   </div>
-                  <span className="text-[10px] text-zinc-500 font-mono font-bold">
-                    Rapport {activeNpcEvent.npc.rapport}/100 • S급 아카이버
+                  <span className="text-[10px] text-zinc-505 font-mono font-bold">
+                    Rapport {activeNpcEvent.npc.rapport}/105 • {activeNpcEvent.npc.rank}
                   </span>
                 </div>
 
                 {/* Speech Box */}
                 <div 
                   onClick={handleSkipDialogueTyping}
-                  className="bg-zinc-950/90 p-3.5 md:p-4 rounded-xl border border-violet-900/30 text-xs text-zinc-100 font-semibold leading-relaxed font-sans mt-1 shadow-inner select-all relative group min-h-[120px] max-h-[180px] overflow-y-auto scrollbar-thin cursor-pointer hover:border-violet-700/50 transition-colors"
+                  className="bg-zinc-950/90 p-3.5 md:p-4 rounded-xl border border-zinc-800 text-xs text-zinc-100 font-semibold leading-relaxed font-sans mt-1 shadow-inner select-all relative group min-h-[120px] max-h-[180px] overflow-y-auto scrollbar-thin cursor-pointer hover:border-zinc-700/50 transition-colors"
                 >
                   <p className="break-keep whitespace-pre-line text-zinc-200 indent-1 font-sans font-semibold text-[11.5px] leading-relaxed tracking-wide">
                     {displayedDialogue}
@@ -734,12 +826,12 @@ export default function LocationScene({
                 {activeNpcEvent.isOutcome ? (
                   /* Outcome Concluded Option */
                   <div className="flex flex-col gap-2 animate-fadeIn">
-                    <p className="text-[10px] text-zinc-505 font-mono font-bold uppercase tracking-widest">
+                    <p className="text-[10px] text-zinc-500 font-mono font-bold uppercase tracking-widest">
                       동조 교정 완료 (RESULT RESOLVED)
                     </p>
                     <button
                       onClick={() => setActiveNpcEvent(null)}
-                      className="w-full py-3 bg-gradient-to-r from-violet-950/50 via-zinc-900 to-indigo-950/50 hover:from-violet-900/70 hover:to-indigo-900/70 border border-violet-850 hover:border-violet-500/50 rounded-xl text-center font-sans text-xs text-violet-300 font-bold tracking-wider transition-all cursor-pointer shadow-md select-none flex justify-center items-center gap-2 group active:scale-[0.99]"
+                      className={`w-full py-3 bg-gradient-to-r ${pStyle.tagGrad} hover:opacity-90 border border-zinc-800 rounded-xl text-center font-sans text-xs text-white font-bold tracking-wider transition-all cursor-pointer shadow-md select-none flex justify-center items-center gap-2 group active:scale-[0.99]`}
                     >
                       <span>🔮 인연 동조 수렴 및 매듭 완료</span>
                     </button>
@@ -748,14 +840,14 @@ export default function LocationScene({
                   /* Interaction Branches */
                   <>
                     <div className="text-[9px] text-zinc-500 font-mono font-bold uppercase tracking-widest flex items-center gap-1 mb-1 select-none">
-                      <span className="w-1 h-1 rounded-full bg-rose-500 animate-ping" />
+                      <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping" />
                       <span>인과율 조율 최적 답변 분기</span>
                     </div>
                     {activeNpcEvent.choices.map((choice, index) => (
                       <button
                         key={index}
                         onClick={() => handleChoiceSelect(choice)}
-                        className="group w-full p-2.5 bg-zinc-950 hover:bg-zinc-900 border border-zinc-850 hover:border-violet-500/40 text-left font-sans text-xs text-zinc-300 hover:text-violet-300 font-bold leading-normal rounded-xl transition-all hover:translate-x-1 active:scale-[0.99] cursor-pointer flex items-center gap-3 shadow-md"
+                        className="group w-full p-2.5 bg-zinc-950 hover:bg-zinc-900 border border-zinc-850 hover:border-violet-500/40 text-left font-sans text-xs text-zinc-300 hover:text-white font-bold leading-normal rounded-xl transition-all hover:translate-x-1 active:scale-[0.99] cursor-pointer flex items-center gap-3 shadow-md"
                       >
                         <span className="w-5 h-5 rounded-lg bg-zinc-900 group-hover:bg-violet-950 border border-zinc-800 group-hover:border-violet-800 text-[10px] text-zinc-500 group-hover:text-violet-400 font-mono font-black flex items-center justify-center shrink-0 transition-all select-none">
                           0{index + 1}
@@ -769,58 +861,8 @@ export default function LocationScene({
             </div>
 
           </div>
-        ) : (
-          /* S-CLASS NPC EVENT DIALOGUE CARDS (For other characters like Baek, Geum without portrait yet) */
-          <div className="p-4 bg-zinc-900 border-2 border-blue-500/30 rounded-2xl flex flex-col gap-3 relative shadow-2xl animate-fadeIn">
-            <div className="absolute -top-3 left-4 bg-blue-500 text-white px-2.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider font-mono shadow-md flex items-center gap-1.5">
-              <Smile className="w-3 h-3 text-white" /> 인연 만남 인카운터
-            </div>
-
-            <div className="flex gap-2.5 items-center border-b border-zinc-800 pb-2.5 mt-1 shrink-0">
-              <span className="text-xl bg-zinc-950 p-2 rounded-xl border border-zinc-850 leading-none shadow-inner">
-                {activeNpcEvent.npc.avatarUrl}
-              </span>
-              <div>
-                <h4 className="font-bold text-xs text-zinc-100 leading-none">{activeNpcEvent.npc.name}</h4>
-                <span className="text-[10px] text-zinc-500 font-mono tracking-wider mt-1 block font-bold">{activeNpcEvent.npc.rank} RECRUITED</span>
-              </div>
-            </div>
-
-            {/* dialogue box style */}
-            <div 
-              onClick={handleSkipDialogueTyping}
-              className="bg-zinc-850/50 p-3.5 rounded-xl border border-zinc-800/40 text-zinc-200 italic text-xs leading-relaxed font-sans break-keep shadow-inner max-h-[160px] overflow-y-auto scrollbar-thin cursor-pointer hover:border-blue-500/30 transition-colors"
-            >
-              <p className="whitespace-pre-line">
-                {displayedDialogue}
-                {isTypingDialogue && <span className="inline-block w-1.5 h-3 ml-0.5 bg-zinc-400 animate-pulse" />}
-              </p>
-            </div>
-
-            <div className="flex flex-col gap-1.5 border-t border-zinc-800 pt-2.5">
-              {activeNpcEvent.isOutcome ? (
-                /* Outcome Concluded Option for standard characters */
-                <button
-                  onClick={() => setActiveNpcEvent(null)}
-                  className="w-full py-2.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-950 font-bold text-xs rounded-xl shadow cursor-pointer transition-transform active:scale-95 text-center font-sans tracking-wide"
-                >
-                  확인 완료
-                </button>
-              ) : (
-                activeNpcEvent.choices.map((choice, index) => (
-                  <button
-                    key={index}
-                    onClick={() => handleChoiceSelect(choice)}
-                    className="p-2.5 bg-zinc-950/80 hover:bg-zinc-800 border border-zinc-850 rounded-xl text-left font-sans text-xs text-zinc-300 font-semibold leading-normal transition-all active:scale-95 cursor-pointer hover:border-blue-500/40"
-                  >
-                    {choice.text}
-                  </button>
-                ))
-              )}
-            </div>
-          </div>
-        )
-      ) : narrativeFeedback ? (
+        );
+      })() : narrativeFeedback ? (
         /* STANDARD DIALOGUE OUTCOME FEEDBACK VIEW */
         <div className="p-4 bg-zinc-900 border border-zinc-800/80 rounded-2xl flex flex-col gap-3 relative shadow-lg animate-fadeIn">
           <span className="text-[10px] font-mono text-blue-400 font-bold uppercase tracking-widest block mb-0.5">▲ 활동 섭렵 및 경계 로그</span>

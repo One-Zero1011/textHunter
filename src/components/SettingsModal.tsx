@@ -6,6 +6,7 @@
 import React from 'react';
 import { motion } from 'motion/react';
 import { CharacterStats } from '../types';
+import { Volume2, VolumeX } from 'lucide-react';
 
 interface SettingsModalProps {
   onClose: () => void;
@@ -15,6 +16,10 @@ interface SettingsModalProps {
   setGold: React.Dispatch<React.SetStateAction<number>>;
   setStats: React.Dispatch<React.SetStateAction<CharacterStats>>;
   setLobbyFeedback: (msg: string) => void;
+  isMuted: boolean;
+  setIsMuted: (muted: boolean) => void;
+  volume: number;
+  setVolume: (v: number) => void;
 }
 
 export default function SettingsModal({
@@ -24,7 +29,11 @@ export default function SettingsModal({
   onExitToLauncher,
   setGold,
   setStats,
-  setLobbyFeedback
+  setLobbyFeedback,
+  isMuted,
+  setIsMuted,
+  volume,
+  setVolume
 }: SettingsModalProps) {
   return (
     <div className="fixed inset-0 bg-zinc-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
@@ -79,7 +88,65 @@ export default function SettingsModal({
           </button>
         </div>
 
-        <div className="w-full h-px bg-zinc-800 my-1"></div>
+        <div className="w-full h-px bg-zinc-800 my-0.5"></div>
+
+        {/* AUDIO SOUND SETTINGS */}
+        <div className="flex flex-col gap-3.5 bg-zinc-950/50 p-4.5 rounded-xl border border-zinc-850/80 font-mono text-xs">
+          <div className="flex justify-between items-center font-bold text-zinc-300">
+            <span className="flex items-center gap-1.5 text-zinc-200">
+              {isMuted || volume === 0 ? (
+                <VolumeX className="w-4 h-4 text-zinc-500" />
+              ) : (
+                <Volume2 className="w-4 h-4 text-emerald-400 animate-pulse" />
+              )}
+              시스템 사운드 제어
+            </span>
+            <span className={`text-[10px] font-semibold ${isMuted ? 'text-zinc-500' : 'text-emerald-400'}`}>
+              {isMuted ? 'Muted (음소거)' : `${volume}%`}
+            </span>
+          </div>
+
+          {/* Volume Slider Block */}
+          <div className="flex flex-col gap-1.5 bg-zinc-900/50 p-2.5 rounded-lg border border-zinc-800/40">
+            <div className="flex justify-between text-[10px] text-zinc-500 font-medium">
+              <span>최소</span>
+              <span>최대</span>
+            </div>
+            <input
+              type="range"
+              min="0"
+              max="100"
+              value={isMuted ? 0 : volume}
+              onChange={(e) => {
+                const newVol = Number(e.target.value);
+                setVolume(newVol);
+                if (isMuted && newVol > 0) {
+                  setIsMuted(false);
+                }
+              }}
+              className="w-full accent-emerald-400 h-1.5 bg-zinc-800 rounded-lg appearance-none cursor-pointer hover:accent-emerald-350 transition-all"
+            />
+          </div>
+
+          <button
+            onClick={() => {
+              setIsMuted(!isMuted);
+              // If we are unmuting and volume is at zero, restore to comfortable 40% default
+              if (isMuted && volume === 0) {
+                setVolume(40);
+              }
+            }}
+            className={`w-full py-2.5 rounded-lg font-bold text-[11px] cursor-pointer transition-all border flex items-center justify-center gap-2 ${
+              isMuted 
+                ? 'bg-zinc-850/80 hover:bg-zinc-800 border-zinc-800 text-zinc-400' 
+                : 'bg-emerald-950/30 border-emerald-500/25 text-emerald-400 hover:bg-emerald-950/50'
+            }`}
+          >
+            <span>{isMuted ? '🔈 오디오 음소거 해제' : '🔇 전체 음소거 설정'}</span>
+          </button>
+        </div>
+
+        <div className="w-full h-px bg-zinc-800 my-0.5"></div>
 
         {/* DEBUG ASSISTANCE OPERATIONS */}
         <div className="flex flex-col gap-2.5">

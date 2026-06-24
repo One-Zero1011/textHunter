@@ -23,10 +23,12 @@ import TutorialOverlay from './components/TutorialOverlay';
 import { getActiveStoryForNpc } from './data/chatStories';
 import { 
   Smartphone, Award, Heart, HelpCircle, Shield, Sparkles, 
-  Settings, Zap, Swords, RotateCcw, AlertTriangle, ShieldCheck, Gamepad2, FolderOpen
+  Settings, Zap, Swords, RotateCcw, AlertTriangle, ShieldCheck, Gamepad2, FolderOpen,
+  Volume2, VolumeX
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { getAssetPath } from './utils';
+import { soundManager } from './utils/soundManager';
 const logoImg = getAssetPath('images/Logo.png');
 
 export default function App() {
@@ -112,7 +114,42 @@ export default function App() {
   const [inheritedLevelMultiplier, setInheritedLevelMultiplier] = useState<number>(0);
 
   // Sound/Mute preference
-  const [isMuted, setIsMuted] = useState<boolean>(true);
+  const [isMuted, setIsMuted] = useState<boolean>(false);
+  const [volume, setVolume] = useState<number>(50); // volume range 0 - 100
+
+  // Synchronize soundManager with our react mute and volume preferences
+  useEffect(() => {
+    soundManager.setMuted(isMuted);
+  }, [isMuted]);
+
+  useEffect(() => {
+    soundManager.setVolume(volume / 100);
+  }, [volume]);
+
+  // Global click sound feedback listener for all interactive tags
+  useEffect(() => {
+    const handleGlobalClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (!target) return;
+      
+      const isInteractive = 
+        target.tagName === 'BUTTON' || 
+        target.closest('button') || 
+        target.closest('a') || 
+        target.closest('[role="button"]') ||
+        target.classList.contains('cursor-pointer') ||
+        target.closest('.cursor-pointer');
+        
+      if (isInteractive) {
+        soundManager.playSfx('click');
+      }
+    };
+    
+    window.addEventListener('click', handleGlobalClick);
+    return () => {
+      window.removeEventListener('click', handleGlobalClick);
+    };
+  }, []);
 
   // Log summary
   const [lobbyFeedback, setLobbyFeedback] = useState<string>('오늘 하루도 무사히 각성하여 성장하십시오.');
@@ -411,6 +448,7 @@ export default function App() {
     handleAdvancePhase(clearedId); // Consumes 1 phase and removes from pool if success
 
     if (success) {
+      soundManager.playSfx('victory');
       let dropMsg = '';
       // High-tier unacquired drop pool
       const unacquiredLootPool = inventory.filter(item => !item.purchased && !isShopItem(item.id));
@@ -448,6 +486,7 @@ export default function App() {
 
   // Die trigger
   const handleDie = () => {
+    soundManager.playSfx('defeat');
     setActiveDungeon(null);
     setEndingType('dead');
   };
@@ -824,6 +863,24 @@ export default function App() {
               <HelpCircle className="w-4 h-4 text-cyan-500/85 hover:text-cyan-400" />
             </button>
 
+            {/* Audio volume trigger */}
+            <button 
+              onClick={() => {
+                soundManager.playSfx('click');
+                setIsMuted(!isMuted);
+              }}
+              className={`transition-colors p-1.5 cursor-pointer bg-zinc-950/40 hover:bg-zinc-800 border border-zinc-800/60 rounded-lg mr-1.5 flex items-center justify-center ${
+                !isMuted ? 'text-emerald-400 hover:text-emerald-350 bg-emerald-950/10' : 'text-zinc-500 hover:text-zinc-400'
+              }`}
+              title={isMuted ? '음소거 해제 (배경음 및 효과음 활성화)' : '음소거 (배경음 및 효과음 해제)'}
+            >
+              {!isMuted ? (
+                <Volume2 className="w-4 h-4 text-emerald-400 animate-pulse" />
+              ) : (
+                <VolumeX className="w-4 h-4 text-zinc-500" />
+              )}
+            </button>
+
             {/* Settings trigger */}
             <button 
               onClick={() => setSettingsOpen(!settingsOpen)}
@@ -865,6 +922,10 @@ export default function App() {
               setGold={setGold}
               setStats={setStats}
               setLobbyFeedback={setLobbyFeedback}
+              isMuted={isMuted}
+              setIsMuted={setIsMuted}
+              volume={volume}
+              setVolume={setVolume}
             />
           )}
           {false && settingsOpen && (
