@@ -5,8 +5,9 @@
 
 import React from 'react';
 import { motion } from 'motion/react';
-import { CharacterStats } from '../types';
-import { Volume2, VolumeX } from 'lucide-react';
+import { CharacterStats, Npc, Equipment } from '../types';
+import { Volume2, VolumeX, Shield, Sparkles, Heart, Briefcase, BookOpen } from 'lucide-react';
+import { SKILLS } from '../data';
 
 interface SettingsModalProps {
   onClose: () => void;
@@ -20,6 +21,12 @@ interface SettingsModalProps {
   setIsMuted: (muted: boolean) => void;
   volume: number;
   setVolume: (v: number) => void;
+  isDevMode: boolean;
+  setIsDevMode: (v: boolean) => void;
+  setInventory: React.Dispatch<React.SetStateAction<Equipment[]>>;
+  setAcquiredSkills: React.Dispatch<React.SetStateAction<string[]>>;
+  setNpcs: React.Dispatch<React.SetStateAction<Npc[]>>;
+  setFatigue: React.Dispatch<React.SetStateAction<number>>;
 }
 
 export default function SettingsModal({
@@ -33,7 +40,13 @@ export default function SettingsModal({
   isMuted,
   setIsMuted,
   volume,
-  setVolume
+  setVolume,
+  isDevMode,
+  setIsDevMode,
+  setInventory,
+  setAcquiredSkills,
+  setNpcs,
+  setFatigue
 }: SettingsModalProps) {
   return (
     <div className="fixed inset-0 bg-zinc-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
@@ -148,37 +161,123 @@ export default function SettingsModal({
 
         <div className="w-full h-px bg-zinc-800 my-0.5"></div>
 
-        {/* DEBUG ASSISTANCE OPERATIONS */}
-        <div className="flex flex-col gap-2.5">
+        {/* DEVELOPER MODE Privilege Control */}
+        <div className="flex flex-col gap-2.5 bg-zinc-950/40 p-4 rounded-xl border border-zinc-800">
           <div className="flex justify-between items-center">
-            <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">🛠️ 인과 지원 제어 코드</span>
-            <span className="text-[9px] bg-blue-500/10 text-blue-400 px-1.5 py-0.2 rounded font-mono">DEBUG</span>
-          </div>
-          <div className="grid grid-cols-2 gap-2">
+            <div className="flex flex-col">
+              <span className="text-xs font-bold text-zinc-200 flex items-center gap-1.5">
+                <Shield className={`w-4 h-4 ${isDevMode ? 'text-rose-400 animate-pulse' : 'text-zinc-500'}`} />
+                개발자 모드 (Developer Mode)
+              </span>
+              <span className="text-[9px] text-zinc-500 font-medium">모든 제한 무시 및 완전 제어 권한 획득</span>
+            </div>
             <button
               onClick={() => {
-                setGold(g => g + 10000);
-                setLobbyFeedback('🛠️ [디버그]: 시공 인과 자금 10,000G가 추가 포팅되었습니다.');
+                setIsDevMode(!isDevMode);
+                setLobbyFeedback(
+                  !isDevMode
+                    ? '🛠️ [시스템]: 개발자 권한이 완벽히 인가되었습니다. 장비/스킬북 습득 제한이 해제됩니다.'
+                    : '🛠️ [시스템]: 개발자 권한이 회수되었습니다.'
+                );
               }}
-              className="py-2.5 px-2 bg-zinc-950 hover:bg-zinc-800 border border-zinc-850 rounded-lg text-[10px] font-bold text-blue-400 cursor-pointer text-center truncate transition-colors font-mono"
+              className={`px-3 py-1 text-[10px] font-extrabold rounded-lg border transition-all cursor-pointer ${
+                isDevMode
+                  ? 'bg-rose-950/40 border-rose-500/50 text-rose-400'
+                  : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200'
+              }`}
             >
-              골드 주입 (+10,000G)
-            </button>
-            <button
-              onClick={() => {
-                setStats(s => ({
-                  strength: s.strength + 5,
-                  agility: s.agility + 5,
-                  mana: s.mana + 5,
-                  intellect: s.intellect + 5,
-                }));
-                setLobbyFeedback('🛠️ [디버그]: 차원 보정 보너스로 실효 전 스탯이 +5 증가했습니다.');
-              }}
-              className="py-2.5 px-2 bg-zinc-950 hover:bg-zinc-800 border border-zinc-850 rounded-lg text-[10px] font-bold text-emerald-400 cursor-pointer text-center truncate transition-colors font-mono"
-            >
-              전 전계 스탯 (+5)
+              {isDevMode ? 'ON (인가됨)' : 'OFF (차단됨)'}
             </button>
           </div>
+
+          {isDevMode && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              className="flex flex-col gap-2 mt-2 pt-2 border-t border-zinc-850"
+            >
+              <span className="text-[9.5px] text-zinc-400 font-bold uppercase tracking-wider font-mono">⚡ 개발자 고속 전수 매트릭스</span>
+              
+              {/* Row 1: Items and Skills */}
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => {
+                    setInventory(prev => prev.map(item => ({ ...item, purchased: true })));
+                    setLobbyFeedback('🛠️ [개발자]: 모든 등급의 기밀 장비 및 스킬북을 전수 장갑화(구매 완료) 처리했습니다.');
+                  }}
+                  className="py-2 bg-zinc-900 hover:bg-zinc-850 border border-zinc-800 rounded-lg text-[10px] font-bold text-violet-400 cursor-pointer flex items-center justify-center gap-1 transition-colors"
+                >
+                  <Briefcase className="w-3.5 h-3.5 shrink-0" />
+                  모든 장비 획득
+                </button>
+
+                <button
+                  onClick={() => {
+                    const allSkillIds = SKILLS.map(s => s.id);
+                    setAcquiredSkills(allSkillIds);
+                    setLobbyFeedback('🛠️ [개발자]: 현존하는 모든 계열의 액티브 스킬을 영혼 인자에 각인 완료했습니다.');
+                  }}
+                  className="py-2 bg-zinc-900 hover:bg-zinc-850 border border-zinc-800 rounded-lg text-[10px] font-bold text-emerald-400 cursor-pointer flex items-center justify-center gap-1 transition-colors"
+                >
+                  <BookOpen className="w-3.5 h-3.5 shrink-0" />
+                  모든 스킬 습득
+                </button>
+              </div>
+
+              {/* Row 2: NPCs & Stats */}
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => {
+                    setNpcs(prev => prev.map(n => ({ ...n, unlocked: true, rapport: 100, isAlly: true })));
+                    setLobbyFeedback('🛠️ [개발자]: 모든 NPC 연합 헌터들의 동기화 락 해제 및 호감도를 100% 동조했습니다.');
+                  }}
+                  className="py-2 bg-zinc-900 hover:bg-zinc-850 border border-zinc-800 rounded-lg text-[10px] font-bold text-rose-400 cursor-pointer flex items-center justify-center gap-1 transition-colors"
+                >
+                  <Heart className="w-3.5 h-3.5 shrink-0" />
+                  NPC 호감도 Max
+                </button>
+
+                <button
+                  onClick={() => {
+                    setStats({
+                      strength: 99,
+                      agility: 99,
+                      health: 99,
+                      intellect: 99
+                    });
+                    setLobbyFeedback('🛠️ [개발자]: 헌터 전 계열 주파수 스탯을 완전 한계 돌파(99) 상태로 고정 증폭했습니다.');
+                  }}
+                  className="py-2 bg-zinc-900 hover:bg-zinc-850 border border-zinc-800 rounded-lg text-[10px] font-bold text-amber-400 cursor-pointer flex items-center justify-center gap-1 transition-colors"
+                >
+                  <Sparkles className="w-3.5 h-3.5 shrink-0" />
+                  모든 스탯 Max
+                </button>
+              </div>
+
+              {/* Row 3: Resources */}
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => {
+                    setGold(g => g + 1000000);
+                    setLobbyFeedback('🛠️ [개발자]: 1,000,000G의 무제한 헌터 크레딧이 공급 투사되었습니다.');
+                  }}
+                  className="py-2 bg-zinc-900 hover:bg-zinc-850 border border-zinc-800 rounded-lg text-[10px] font-bold text-yellow-500 cursor-pointer text-center transition-colors font-mono"
+                >
+                  💰 +1,000,000G
+                </button>
+
+                <button
+                  onClick={() => {
+                    setFatigue(100);
+                    setLobbyFeedback('🛠️ [개발자]: 차원 안정 장치가 과부하 기력을 즉시 무결회복(100) 하였습니다.');
+                  }}
+                  className="py-2 bg-zinc-900 hover:bg-zinc-850 border border-zinc-800 rounded-lg text-[10px] font-bold text-sky-400 cursor-pointer text-center transition-colors font-mono"
+                >
+                  ⚡ 기력 완충
+                </button>
+              </div>
+            </motion.div>
+          )}
         </div>
 
         {/* Close Button footer */}

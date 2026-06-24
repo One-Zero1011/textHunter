@@ -116,6 +116,7 @@ export default function App() {
   // Sound/Mute preference
   const [isMuted, setIsMuted] = useState<boolean>(false);
   const [volume, setVolume] = useState<number>(50); // volume range 0 - 100
+  const [isDevMode, setIsDevMode] = useState<boolean>(false);
 
   // Synchronize soundManager with our react mute and volume preferences
   useEffect(() => {
@@ -129,6 +130,9 @@ export default function App() {
   // Global click sound feedback listener for all interactive tags
   useEffect(() => {
     const handleGlobalClick = (e: MouseEvent) => {
+      // Safely ensure background music is playing on user gesture
+      soundManager.ensureBgmPlaying();
+
       const target = e.target as HTMLElement | null;
       if (!target) return;
       
@@ -185,6 +189,7 @@ export default function App() {
         inheritedLevelMultiplier,
         lobbyFeedback,
         equippedTitleId,
+        isDevMode,
       };
       localStorage.setItem('hunter_f_save_state', JSON.stringify(stateToSave));
       setHasSave(true);
@@ -215,6 +220,7 @@ export default function App() {
       if (data.inheritedLevelMultiplier !== undefined) setInheritedLevelMultiplier(data.inheritedLevelMultiplier);
       if (data.lobbyFeedback !== undefined) setLobbyFeedback(data.lobbyFeedback);
       if (data.equippedTitleId !== undefined) setEquippedTitleId(data.equippedTitleId);
+      if (data.isDevMode !== undefined) setIsDevMode(data.isDevMode);
       
       setGameStarted(true);
       setIntroActive(false);
@@ -264,6 +270,7 @@ export default function App() {
     setHasSave(false);
     setOnLauncher(true);
     setEquippedTitleId(null);
+    setIsDevMode(false);
     setLobbyFeedback('♻️ 시뮬레이터가 완치된 초기 각인 상태로 역행 설정되었습니다.');
   };
 
@@ -818,6 +825,7 @@ export default function App() {
                   setEquippedTitleId(titleId);
                   saveGameStateReal();
                 }}
+                isDevMode={isDevMode}
               />
               {/* Decorative Home Indicator phone button notch bar */}
               <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 w-28 h-1 bg-zinc-800 rounded-full z-50"></div>
@@ -926,6 +934,12 @@ export default function App() {
               setIsMuted={setIsMuted}
               volume={volume}
               setVolume={setVolume}
+              isDevMode={isDevMode}
+              setIsDevMode={setIsDevMode}
+              setInventory={setInventory}
+              setAcquiredSkills={setAcquiredSkills}
+              setNpcs={setNpcs}
+              setFatigue={setFatigue}
             />
           )}
           {false && settingsOpen && (

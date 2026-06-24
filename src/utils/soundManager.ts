@@ -44,21 +44,15 @@ class SoundManager {
   }
 
   private initBgm() {
-    try {
-      const bgmPath = getAssetPath('sounds/bgm.wav');
-      this.bgm = new Audio(bgmPath);
-      this.bgm.loop = true;
-      this.updateBgmVolume();
-    } catch (e) {
-      console.warn('[SoundManager] Could not initialize BGM:', e);
-    }
+    // Background music disabled per user request to keep the app silent except for SFX
+    this.bgm = null;
   }
 
   private preloadSfx() {
     const sfxList: SfxType[] = ['click', 'levelup', 'heal', 'hit', 'victory', 'defeat'];
     sfxList.forEach((sfx) => {
       try {
-        const sfxPath = getAssetPath(`sounds/${sfx}.wav`);
+        const sfxPath = getAssetPath(`sounds/${sfx}.wav?v=3`);
         const audio = new Audio(sfxPath);
         this.sfxCache[sfx] = audio;
         this.updateSfxVolume(sfx);
@@ -70,14 +64,15 @@ class SoundManager {
 
   private updateBgmVolume() {
     if (this.bgm) {
-      // Balanced BGM ratio targeting 35% of the master volume, keeps ambient track gentle
-      this.bgm.volume = 0.35 * this.volume;
+      // Significantly increase BGM weight (from 0.35 to 0.75) so it's fully and clearly audible at 50% master volume
+      this.bgm.volume = 0.75 * this.volume;
+      console.log('[SoundManager] Updated BGM volume to:', this.bgm.volume, '(master:', this.volume, ')');
     }
   }
 
   private updateSfxVolume(sfx?: SfxType) {
     const applyVolume = (type: SfxType, audio: HTMLAudioElement) => {
-      const baseWeight = type === 'click' ? 0.35 : type === 'hit' ? 0.6 : type === 'heal' ? 0.7 : 0.8;
+      const baseWeight = type === 'click' ? 0.45 : type === 'hit' ? 0.7 : type === 'heal' ? 0.8 : 0.9;
       audio.volume = baseWeight * this.volume;
     };
 
@@ -137,24 +132,24 @@ class SoundManager {
   }
 
   /**
-   * Play background ambient loop safely
+   * Play background ambient loop safely (BGM disabled per user request)
    */
   public playBgm() {
-    if (this.isMuted || !this.bgm || this.volume <= 0) return;
-    
-    this.bgm.play().catch((err) => {
-      // Autoplay blocked by browser. This is normal until first user interaction.
-      console.log('[SoundManager] BGM play delayed (awaiting user gesture):', err.message);
-    });
+    // Background music disabled per user request
   }
 
   /**
-   * Pause background ambient loop
+   * Ensure BGM is playing (BGM disabled per user request)
+   */
+  public ensureBgmPlaying() {
+    // Background music disabled per user request
+  }
+
+  /**
+   * Pause background ambient loop (BGM disabled per user request)
    */
   public pauseBgm() {
-    if (this.bgm) {
-      this.bgm.pause();
-    }
+    // Background music disabled per user request
   }
 
   /**
@@ -172,10 +167,10 @@ class SoundManager {
           console.warn(`[SoundManager] Play SFX blocked (${type}):`, err);
         });
       } else {
-        // Fallback load
-        const sfxPath = getAssetPath(`sounds/${type}.wav`);
+        // Fallback load with cache busting
+        const sfxPath = getAssetPath(`sounds/${type}.wav?v=3`);
         const audio = new Audio(sfxPath);
-        const baseWeight = type === 'click' ? 0.35 : type === 'hit' ? 0.6 : type === 'heal' ? 0.7 : 0.8;
+        const baseWeight = type === 'click' ? 0.45 : type === 'hit' ? 0.7 : type === 'heal' ? 0.8 : 0.9;
         audio.volume = baseWeight * this.volume;
         audio.play().catch(() => {});
       }

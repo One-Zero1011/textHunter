@@ -38,6 +38,7 @@ interface PhoneModalProps {
   playerName: string;
   equippedTitleId: string | null;
   onEquipTitle: (titleId: string | null) => void;
+  isDevMode?: boolean;
 }
 
 const getPortraitPath = (id: string): string => {
@@ -79,7 +80,8 @@ export default function PhoneModal({
   onClose,
   playerName,
   equippedTitleId,
-  onEquipTitle
+  onEquipTitle,
+  isDevMode = false
 }: PhoneModalProps) {
   const [activeTab, setActiveTab] = useState<TabType>(initialTab);
   const [selectedNpcId, setSelectedNpcId] = useState<string | null>(null);
@@ -948,8 +950,11 @@ export default function PhoneModal({
             >
               {selectedNpcId === null ? (
                 <div className="flex flex-col gap-3">
-                  <span className="text-xs text-zinc-500 font-mono font-bold uppercase tracking-wider">각성자 등급 연합 구조체</span>
-                  {npcs.filter(n => n.unlocked).length === 0 ? (
+                  <span className="text-xs text-zinc-500 font-mono font-bold uppercase tracking-wider flex justify-between items-center">
+                    <span>각성자 등급 연합 구조체</span>
+                    {isDevMode && <span className="text-rose-400 font-bold text-[9px] bg-rose-950/40 px-1.5 py-0.5 rounded border border-rose-900/30">🛠️ 개발자 권한: 전체 동행자 리스팅</span>}
+                  </span>
+                  {npcs.filter(n => isDevMode || n.unlocked).length === 0 ? (
                     <div className="flex flex-col items-center justify-center p-8 py-10 text-center bg-zinc-900 border border-zinc-800/80 rounded-2xl shadow-sm mt-2">
                       <span className="text-4xl mb-3 animate-pulse">🔍</span>
                       <h4 className="font-bold text-zinc-200 text-sm">영입 가능한 동행자가 없습니다</h4>
@@ -958,11 +963,13 @@ export default function PhoneModal({
                       </p>
                     </div>
                   ) : (
-                    npcs.filter(n => n.unlocked).map((npc) => (
+                    npcs.filter(n => isDevMode || n.unlocked).map((npc) => (
                       <button
                         key={npc.id}
                         onClick={() => setSelectedNpcId(npc.id)}
-                        className="p-3.5 bg-zinc-900 border border-zinc-800 rounded-xl text-left hover:border-blue-500/40 transition-all flex justify-between items-center shadow cursor-pointer active:scale-98"
+                        className={`p-3.5 bg-zinc-900 border rounded-xl text-left hover:border-blue-500/40 transition-all flex justify-between items-center shadow cursor-pointer active:scale-98 ${
+                          !npc.unlocked ? 'opacity-60 border-zinc-850 bg-zinc-950/40' : 'border-zinc-800'
+                        }`}
                       >
                         <div className="flex gap-3 items-center">
                           <div className="w-12 h-12 rounded-xl bg-zinc-950 border border-zinc-850 flex items-center justify-center text-xl shadow-inner overflow-hidden">
@@ -972,6 +979,9 @@ export default function PhoneModal({
                             <div className="flex items-center gap-2">
                               <h4 className="font-bold text-sm text-zinc-200">{npc.name}</h4>
                               <span className="text-xs bg-blue-950 border border-blue-900/30 text-blue-400 px-2 py-0.5 rounded font-mono font-bold">S_RANK</span>
+                              {!npc.unlocked && (
+                                <span className="text-[9px] font-bold text-rose-400 bg-rose-950/40 px-1.5 py-0.2 rounded border border-rose-905/30">🔒 잠금됨</span>
+                              )}
                             </div>
                             <p className="text-xs text-zinc-400 text-ellipsis overflow-hidden line-clamp-1 max-w-[170px] mt-1 pr-1 font-sans font-medium">{npc.catchphrase}</p>
                           </div>
@@ -1026,6 +1036,54 @@ export default function PhoneModal({
                             <span>{npc.rapport} / 100</span>
                           </div>
                         </div>
+
+                        {isDevMode && (
+                          <div className="mt-3 p-3.5 bg-rose-950/20 border border-rose-500/25 rounded-xl flex flex-col gap-2 font-sans select-none">
+                            <span className="text-[10px] text-rose-400 font-extrabold tracking-wider uppercase flex items-center gap-1">
+                              🛡️ 개발자 권한: 동기화 인자 제어
+                            </span>
+                            <div className="grid grid-cols-2 gap-2 text-[10px]">
+                              <button
+                                onClick={() => {
+                                  setNpcs(prev => prev.map(n => n.id === npc.id ? { ...n, unlocked: !n.unlocked } : n));
+                                }}
+                                className={`py-1.5 border font-bold rounded-lg cursor-pointer transition-all ${
+                                  npc.unlocked 
+                                    ? 'bg-rose-955/30 border-rose-500/20 text-rose-450 hover:bg-rose-955/50' 
+                                    : 'bg-zinc-800 border-zinc-750 text-zinc-200 hover:bg-zinc-750'
+                                }`}
+                              >
+                                {npc.unlocked ? '🔒 강제 잠금' : '🔓 강제 잠금해제'}
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setNpcs(prev => prev.map(n => n.id === npc.id ? { ...n, unlocked: true, rapport: 100 } : n));
+                                }}
+                                className="py-1.5 bg-emerald-950/40 hover:bg-emerald-900 border border-emerald-900/30 text-emerald-400 rounded-lg font-bold cursor-pointer transition-colors text-center"
+                              >
+                                ⚡ 호감도 Max (100)
+                              </button>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2 text-[10px]">
+                              <button
+                                onClick={() => {
+                                  setNpcs(prev => prev.map(n => n.id === npc.id ? { ...n, rapport: Math.min(100, n.rapport + 10) } : n));
+                                }}
+                                className="py-1.5 bg-blue-950/40 hover:bg-blue-900 border border-blue-900/30 text-blue-400 rounded-lg font-bold cursor-pointer transition-colors text-center"
+                              >
+                                ❤️ 호감도 +10
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setNpcs(prev => prev.map(n => n.id === npc.id ? { ...n, rapport: Math.max(0, n.rapport - 10) } : n));
+                                }}
+                                className="py-1.5 bg-zinc-950 hover:bg-zinc-800 border border-zinc-850 text-zinc-400 rounded-lg font-bold cursor-pointer transition-colors text-center"
+                              >
+                                ❤️ 호감도 -10
+                              </button>
+                            </div>
+                          </div>
+                        )}
                         
                         <div className="mt-3.5 flex flex-col gap-3 text-xs md:text-sm leading-relaxed">
                           <p className="text-zinc-300 bg-zinc-950/60 p-3.5 rounded-xl border border-zinc-800/40 text-xs md:text-sm">{npc.description}</p>
@@ -1295,6 +1353,7 @@ export default function PhoneModal({
 
           {/* ===================== TAB 5: GEAR SHOP / INVENTORY ===================== */}
           {activeTab === 'inventory' && (() => {
+            const displayedItems = isDevMode ? inventory : inventory.filter(item => item.purchased);
             const ownedItems = inventory.filter(item => item.purchased);
             
             const categoryMeta = [
@@ -1310,8 +1369,8 @@ export default function PhoneModal({
             ];
 
             const filteredItems = inventoryFilter === 'all'
-              ? ownedItems
-              : ownedItems.filter(item => item.slot === inventoryFilter);
+              ? displayedItems
+              : displayedItems.filter(item => item.slot === inventoryFilter);
 
             return (
               <motion.div
@@ -1322,8 +1381,12 @@ export default function PhoneModal({
               >
                 {/* HUD Bar */}
                 <div className="p-3.5 bg-zinc-900 rounded-2xl border border-zinc-800 flex justify-between items-center font-mono shadow">
-                  <span className="text-xs text-zinc-400 font-bold uppercase tracking-wider">헌터 보관 가방</span>
-                  <span className="text-zinc-100 font-bold text-xs">{ownedItems.length} 개 보유 중</span>
+                  <span className="text-xs text-zinc-400 font-bold uppercase tracking-wider">
+                    {isDevMode ? '🛠️ 헌터 보관 가방 (개발자 권한)' : '헌터 보관 가방'}
+                  </span>
+                  <span className="text-zinc-100 font-bold text-xs">
+                    {isDevMode ? `${inventory.length}개 전체 노출` : `${ownedItems.length} 개 보유 중`}
+                  </span>
                 </div>
 
                 {/* Category Filters */}
@@ -1331,8 +1394,8 @@ export default function PhoneModal({
                   {categoryMeta.map((cat) => {
                     const isActive = inventoryFilter === cat.value;
                     const catCount = cat.value === 'all'
-                      ? ownedItems.length
-                      : ownedItems.filter(item => item.slot === cat.value).length;
+                      ? displayedItems.length
+                      : displayedItems.filter(item => item.slot === cat.value).length;
 
                     return (
                       <button
@@ -1396,32 +1459,41 @@ export default function PhoneModal({
                             </div>
                           </div>
 
-                          <div className="shrink-0 flex flex-col items-end gap-1.5 min-w-[80px]">
-                            {item.slot === 'skillbook' ? (
-                              <button
-                                disabled={isSkillLearned}
-                                onClick={() => handleUseSkillBook(item)}
-                                className={`w-full py-2 rounded-xl text-xs font-bold cursor-pointer transition-transform active:scale-[0.97] shadow-sm text-center font-sans ${
-                                  isSkillLearned
-                                    ? 'bg-zinc-850 text-zinc-500 border border-zinc-800 cursor-not-allowed'
-                                    : 'bg-emerald-950/40 hover:bg-emerald-900/40 border border-emerald-900/40 text-emerald-400'
-                                }`}
-                              >
-                                {isSkillLearned ? '습득 완료' : '전수 학습'}
-                              </button>
-                            ) : (
-                              <button
-                                onClick={() => toggleEquip(item.id)}
-                                className={`w-full py-2 rounded-xl text-xs font-mono font-bold cursor-pointer transition-all ${
-                                  item.equipped 
-                                    ? 'bg-blue-955/40 text-blue-400 border border-blue-900/30 font-black' 
-                                    : 'bg-zinc-800 hover:bg-zinc-750 text-zinc-200'
-                                }`}
-                              >
-                                {item.equipped ? 'EQUIPPED' : '장착하기'}
-                              </button>
-                            )}
-                          </div>
+                           <div className="shrink-0 flex flex-col items-end gap-1.5 min-w-[80px]">
+                             {!item.purchased ? (
+                               <button
+                                 onClick={() => {
+                                   setInventory(prev => prev.map(i => i.id === item.id ? { ...i, purchased: true } : i));
+                                 }}
+                                 className="w-full py-2 bg-rose-950/40 hover:bg-rose-900 border border-rose-800 text-rose-400 rounded-xl text-xs font-bold cursor-pointer transition-all active:scale-[0.97]"
+                               >
+                                 🔓 무료 획득
+                               </button>
+                             ) : item.slot === 'skillbook' ? (
+                               <button
+                                 disabled={isSkillLearned}
+                                 onClick={() => handleUseSkillBook(item)}
+                                 className={`w-full py-2 rounded-xl text-xs font-bold cursor-pointer transition-transform active:scale-[0.97] shadow-sm text-center font-sans ${
+                                   isSkillLearned
+                                     ? 'bg-zinc-850 text-zinc-500 border border-zinc-800 cursor-not-allowed'
+                                     : 'bg-emerald-950/40 hover:bg-emerald-900/40 border border-emerald-900/40 text-emerald-400'
+                                 }`}
+                               >
+                                 {isSkillLearned ? '습득 완료' : '전수 학습'}
+                               </button>
+                             ) : (
+                               <button
+                                 onClick={() => toggleEquip(item.id)}
+                                 className={`w-full py-2 rounded-xl text-xs font-mono font-bold cursor-pointer transition-all ${
+                                   item.equipped 
+                                     ? 'bg-blue-955/40 text-blue-400 border border-blue-900/30 font-black' 
+                                     : 'bg-zinc-800 hover:bg-zinc-750 text-zinc-200'
+                                 }`}
+                               >
+                                 {item.equipped ? 'EQUIPPED' : '장착하기'}
+                               </button>
+                             )}
+                           </div>
                         </div>
                       );
                     })
